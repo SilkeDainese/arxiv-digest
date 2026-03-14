@@ -94,13 +94,27 @@ def verify_password(password: str, salt_hex: str, digest_hex: str) -> bool:
 
 def public_record(record: dict[str, Any]) -> dict[str, Any]:
     """Return the non-sensitive fields of a student record."""
+    normalized = normalise_public_subscription(record)
     return {
-        "email": record["email"],
-        "package_ids": list(record.get("package_ids", [])),
-        "max_papers_per_week": clamp_max_papers(record.get("max_papers_per_week")),
-        "active": bool(record.get("active", True)),
+        "email": normalized["email"],
+        "package_ids": normalized["package_ids"],
+        "max_papers_per_week": normalized["max_papers_per_week"],
+        "active": normalized["active"],
         "created_at": record.get("created_at"),
         "updated_at": record.get("updated_at"),
+    }
+
+
+def normalise_public_subscription(record: dict[str, Any]) -> dict[str, Any]:
+    """Return a validated public subscription record."""
+    email = normalise_email(record.get("email", ""))
+    if not email:
+        raise ValueError("Subscription record is missing an email.")
+    return {
+        "email": email,
+        "package_ids": normalise_package_ids(record.get("package_ids", [])),
+        "max_papers_per_week": clamp_max_papers(record.get("max_papers_per_week")),
+        "active": bool(record.get("active", True)),
     }
 
 

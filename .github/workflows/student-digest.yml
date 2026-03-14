@@ -4,6 +4,20 @@ on:
   schedule:
     - cron: '0 7 * * 1'
   workflow_dispatch:
+    inputs:
+      preview:
+        description: Render HTML previews instead of sending emails
+        required: false
+        type: boolean
+        default: false
+      recipient:
+        description: Optional single student email to process
+        required: false
+        type: string
+      limit:
+        description: Optional max number of students to process
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -33,9 +47,29 @@ jobs:
           STUDENT_ADMIN_TOKEN: ${{ secrets.STUDENT_ADMIN_TOKEN }}
           STUDENT_MANAGE_URL: ${{ vars.STUDENT_MANAGE_URL }}
           STUDENT_REGISTRY_URL: ${{ vars.STUDENT_REGISTRY_URL }}
+          WORKFLOW_DISPATCH_PREVIEW: ${{ inputs.preview }}
+          WORKFLOW_DISPATCH_RECIPIENT: ${{ inputs.recipient }}
+          WORKFLOW_DISPATCH_LIMIT: ${{ inputs.limit }}
         run: |
           if [ -z "$STUDENT_ADMIN_TOKEN" ]; then
             echo "No STUDENT_ADMIN_TOKEN configured; skipping AU student digests."
             exit 0
           fi
-          python student_digest.py
+          cmd=(python student_digest.py)
+          if [ "$WORKFLOW_DISPATCH_PREVIEW" = "true" ]; then
+            cmd+=(--preview --preview-dir student_previews)
+          fi
+          if [ -n "$WORKFLOW_DISPATCH_RECIPIENT" ]; then
+            cmd+=(--recipient "$WORKFLOW_DISPATCH_RECIPIENT")
+          fi
+          if [ -n "$WORKFLOW_DISPATCH_LIMIT" ]; then
+            cmd+=(--limit "$WORKFLOW_DISPATCH_LIMIT")
+          fi
+          "${cmd[@]}"
+
+      - name: Upload preview artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: student-previews
+          path: student_previews/

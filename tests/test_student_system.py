@@ -4,6 +4,7 @@ from student_digest import annotate_student_packages, make_student_digest_config
 from student_registry import (
     build_student_record,
     normalise_package_ids,
+    normalise_public_subscription,
     public_record,
     verify_password,
 )
@@ -142,6 +143,24 @@ def test_public_record_strips_sensitive_fields():
     assert "password_salt" not in public
 
 
+def test_normalise_public_subscription_clamps_and_validates():
+    public = normalise_public_subscription(
+        {
+            "email": " Student@Example.com ",
+            "package_ids": ["stars", "stars", "galaxies"],
+            "max_papers_per_week": 99,
+            "active": 0,
+        }
+    )
+
+    assert public == {
+        "email": "student@example.com",
+        "package_ids": ["stars", "galaxies"],
+        "max_papers_per_week": 20,
+        "active": False,
+    }
+
+
 def test_footer_uses_student_manage_links_when_present():
     footer = _render_footer(
         {
@@ -210,3 +229,34 @@ def test_student_digest_preview_writes_html(tmp_path, monkeypatch):
     assert sent == []
     preview_path = tmp_path / "student_example.com.html"
     assert preview_path.read_text(encoding="utf-8") == "student@example.com:1"
+
+
+def test_fetch_student_subscriptions_skips_invalid_records(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return (
+                b'{"subscriptions": ['
+                b'{"email": "ok@example.com", "package_ids": ["stars"], "max_papers_per_week": 5, "active": true},'
+                b'{"email": "", "package_ids": [], "max_papers_per_week": 3, "active": true}'
+                b']}'
+            )
+
+    monkeypatch.setenv("STUDENT_ADMIN_TOKEN", "secret-token")
+    monkeypatch.setattr(sd.urllib.request, "urlopen", lambda request, timeout=30: FakeResponse())
+
+    subscriptions = sd.fetch_student_subscriptions()
+
+    assert subscriptions == [
+        {
+            "email": "ok@example.com",
+            "package_ids": ["stars"],
+            "max_papers_per_week": 5,
+            "active": True,
+        }
+    ]

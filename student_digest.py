@@ -24,7 +24,12 @@ from digest import (
 )
 from setup.data import ASTRO_MINI_TRACKS, AU_STUDENT_TELESCOPE_KEYWORDS
 from setup.student_presets import build_au_student_config
-from student_registry import AVAILABLE_STUDENT_PACKAGES, normalise_email, package_labels
+from student_registry import (
+    AVAILABLE_STUDENT_PACKAGES,
+    normalise_email,
+    normalise_public_subscription,
+    package_labels,
+)
 
 STUDENT_REGISTRY_URL = os.environ.get(
     "STUDENT_REGISTRY_URL",
@@ -66,7 +71,13 @@ def fetch_student_subscriptions() -> list[dict[str, Any]]:
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         data = json.loads(response.read().decode("utf-8"))
-    return list(data.get("subscriptions", []))
+    subscriptions: list[dict[str, Any]] = []
+    for raw_subscription in data.get("subscriptions", []):
+        try:
+            subscriptions.append(normalise_public_subscription(raw_subscription))
+        except (TypeError, ValueError) as exc:
+            print(f"   ↷ Skipping invalid student subscription record: {exc}")
+    return subscriptions
 
 
 def annotate_student_packages(papers: list[dict[str, Any]]) -> None:
