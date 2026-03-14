@@ -128,9 +128,10 @@ Key fields:
 | `keywords` | Dictionary of `keyword: weight` pairs (1-10) |
 | `keyword_aliases` | Optional `keyword: [similar phrases]` overrides for brittle terminology |
 | `recipient_view_mode` | `deep_read` (full cards) or `5_min_skim` (top 3 one-line summaries) |
+| `recipient_email` | Optional fallback recipient if you do not want to set `RECIPIENT_EMAIL` as a repo secret |
 | `categories` | arXiv categories to monitor |
 | `research_authors` | Authors whose papers get a relevance boost |
-| `colleagues` | People/institutions whose papers always show |
+| `colleagues` | People/institutions whose papers always show; people can also carry an optional `note` shown in the digest |
 | `github_repo` | Your fork's path (enables self-service links in emails) |
 
 ---

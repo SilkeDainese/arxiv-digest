@@ -27,8 +27,13 @@ jobs:
       - name: Check required secrets
         run: |
           if [ ! -f config.yaml ]; then echo "❌ config.yaml is missing. Upload your generated config.yaml to the repo before running the digest."; exit 1; fi
-          if [ -z "$RECIPIENT_EMAIL" ]; then echo "❌ RECIPIENT_EMAIL is not set!"; exit 1; fi
-          echo "✅ RECIPIENT_EMAIL configured (comma-separated lists are supported)"
+          CONFIG_RECIPIENT=$(python -c "import yaml; c=yaml.safe_load(open('config.yaml')); print((c.get('recipient_email') or '').strip())" 2>/dev/null || echo "")
+          if [ -z "$RECIPIENT_EMAIL" ] && [ -z "$CONFIG_RECIPIENT" ]; then echo "❌ RECIPIENT_EMAIL is not set and config.yaml has no recipient_email."; exit 1; fi
+          if [ -n "$RECIPIENT_EMAIL" ]; then
+            echo "✅ RECIPIENT_EMAIL configured via repo secret (comma-separated lists are supported)"
+          else
+            echo "✅ recipient_email configured in config.yaml"
+          fi
           # SMTP credentials: support both new (SMTP_*) and legacy (GMAIL_*) names
           SMTP_U="${SMTP_USER:-$GMAIL_USER}"
           SMTP_P="${SMTP_PASSWORD:-$GMAIL_APP_PASSWORD}"

@@ -65,6 +65,8 @@ colleagues:
   people:
     - name: Jane Smith
       match: ["Smith, J"]
+      # Optional note shown in the digest for tracked people
+      note: "Teaches Stars and planets"
   institutions:
     - Aarhus University
 
@@ -98,6 +100,8 @@ department: ""           # shown in email footer
 tagline: ""              # optional footer quote
 
 # ── Email Settings ─────────────────────────────
+# Optional fallback if you do not want to store RECIPIENT_EMAIL as a repo secret.
+# recipient_email: "student@example.com"
 # Default: Gmail. For Outlook/Office 365, use smtp.office365.com
 smtp_server: "smtp.gmail.com"
 smtp_port: 587

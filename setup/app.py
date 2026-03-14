@@ -216,6 +216,89 @@ ASTRO_MINI_TRACKS = {
     },
 }
 
+AU_STUDENT_TRACK_LABELS = {
+    "au_astronomy": "AU Astronomy",
+    "stars": "Stars",
+    "galaxies": "Galaxies",
+    "cosmology": "Cosmology",
+    "exoplanets": "Planets + exoplanets",
+}
+AU_STUDENT_ALWAYS_TAG = "AU Astronomy"
+
+AU_ASTRONOMY_PEOPLE = [
+    {
+        "name": "Simon Albrecht",
+        "match": ["Albrecht, S", "Simon Albrecht"],
+        "note": "Professor; teaches Exoplanets, Astrophysics, and Space Missions.",
+    },
+    {
+        "name": "Mia Sloth Lundkvist",
+        "match": ["Lundkvist, M", "Mia Sloth Lundkvist", "Mia S Lundkvist"],
+        "note": "Associate professor; teaches Stars and planets.",
+    },
+    {
+        "name": "Frank Grundahl",
+        "match": ["Grundahl, F", "Frank Grundahl"],
+        "note": "Professor; teaches Observational astrophysics and Intro to galaxies.",
+    },
+    {
+        "name": "Karsten Brogaard",
+        "match": ["Brogaard, K", "Karsten Brogaard", "Karsten Frank Brogaard"],
+        "note": "Associate professor; teaches Exoplanets and Astrophysics.",
+    },
+    {
+        "name": "Mikkel Norup Lund",
+        "match": ["Lund, M", "Mikkel N Lund", "Mikkel Norup Lund", "Mikkel Norup"],
+        "note": "Associate professor; teaches Asteroseismology and Experimental methods in astrophysics.",
+    },
+    {
+        "name": "Hans Kjeldsen",
+        "match": ["Kjeldsen, H", "Hans Kjeldsen"],
+        "note": "Professor; stellar astrophysics, exoplanets, and Aarhus space instrumentation.",
+    },
+    {
+        "name": "Christoffer Karoff",
+        "match": ["Karoff, C", "Christoffer Karoff"],
+        "note": "Professor; solar activity, student satellites, and Earth-observation space science.",
+    },
+    {
+        "name": "Mads Fredslund Andersen",
+        "match": [
+            "Fredslund Andersen, M",
+            "Mads Fredslund Andersen",
+            "Mads F Andersen",
+        ],
+        "note": "Associate professor; SONG telescope, astronomical instrumentation, and student space projects.",
+    },
+]
+
+AU_STUDENT_TELESCOPE_KEYWORDS = {
+    "SONG": 9,
+    "SONG telescope": 9,
+    "Ole Romer Observatory": 8,
+    "FUT": 8,
+    "FUT telescope": 8,
+    "Nordic Optical Telescope": 7,
+    "FIES": 6,
+    "student satellite": 7,
+    "Delphini-1": 8,
+    "AUSAT": 6,
+    "data release": 6,
+    "review": 6,
+    "survey": 5,
+    "catalog": 5,
+}
+
+AU_STUDENT_KEYWORD_ALIASES = {
+    "SONG": ["Stellar Observations Network Group"],
+    "Ole Romer Observatory": ["Ole Rømer Observatory"],
+    "FUT": ["FUTeleskop", "Foreningen af Unge Fysikere Telescope"],
+    "Nordic Optical Telescope": ["NOT telescope"],
+    "student satellite": ["student space mission", "student space program"],
+    "review": ["review article", "topical review"],
+    "catalog": ["catalogue"],
+}
+
 
 def _merge_mini_keywords(track_ids: list[str]) -> dict[str, int]:
     """Merge preset keyword weights, keeping the highest weight per term."""
@@ -388,6 +471,91 @@ def _build_mini_student_config(
     return config, "0 7 * * 1"
 
 
+def _build_au_student_research_context(
+    track_ids: list[str], reading_mode: str
+) -> str:
+    """Return the AU-student weekly research context used for AI scoring."""
+    labels = [
+        AU_STUDENT_TRACK_LABELS[track_id]
+        for track_id in track_ids
+        if track_id in AU_STUDENT_TRACK_LABELS and track_id != "au_astronomy"
+    ]
+    if not labels:
+        labels = [
+            label
+            for track_id, label in AU_STUDENT_TRACK_LABELS.items()
+            if track_id != "au_astronomy"
+        ]
+    focus = ", ".join(labels[:-1]) + f", and {labels[-1]}" if len(labels) > 1 else labels[0]
+    if reading_mode == "biggest_only":
+        return (
+            f"I am an Aarhus University astronomy student following {focus.lower()}. "
+            "Prioritise only the most important new papers each week: landmark observations, major theory advances, major surveys or data releases, and strong review-style papers that help build intuition quickly. "
+            "Also surface papers connected to Aarhus astronomy, AU-run telescopes, or AU student space projects."
+        )
+    return (
+        f"I am an Aarhus University astronomy student following {focus.lower()}. "
+        "Prioritise readable and important papers each week: clear observational results, strong review-style papers, major surveys or data releases, and discoveries that are useful for learning the field. "
+        "Also surface papers connected to Aarhus astronomy, AU-run telescopes, or AU student space projects."
+    )
+
+
+def _build_au_student_config(
+    student_name: str, student_email: str, track_ids: list[str], reading_mode: str
+) -> dict:
+    """Build a hidden AU-student digest config with AU astronomy defaults."""
+    selected = track_ids or list(AU_STUDENT_TRACK_LABELS.keys())
+    categories: list[str] = []
+    for track_id in selected:
+        for category in ASTRO_MINI_TRACKS.get(track_id, {}).get("categories", []):
+            if category not in categories:
+                categories.append(category)
+
+    keywords = _merge_keyword_weights(
+        _merge_mini_keywords(selected),
+        AU_STUDENT_TELESCOPE_KEYWORDS,
+    )
+
+    config = {
+        "digest_name": "AU Astronomy Student Weekly",
+        "researcher_name": student_name.strip() or "AU Astronomy Student",
+        "recipient_email": student_email.strip(),
+        "student_tracks": list(
+            dict.fromkeys(
+                [AU_STUDENT_ALWAYS_TAG]
+                + [
+                    AU_STUDENT_TRACK_LABELS[track_id]
+                    for track_id in selected
+                    if track_id in AU_STUDENT_TRACK_LABELS
+                ]
+            )
+        ),
+        "research_context": _build_au_student_research_context(
+            selected, reading_mode
+        ),
+        "categories": categories,
+        "keywords": keywords,
+        "keyword_aliases": dict(AU_STUDENT_KEYWORD_ALIASES),
+        "self_match": [],
+        "research_authors": [person["name"] for person in AU_ASTRONOMY_PEOPLE],
+        "colleagues": {"people": list(AU_ASTRONOMY_PEOPLE), "institutions": []},
+        "digest_mode": "highlights",
+        "recipient_view_mode": "5_min_skim",
+        "days_back": 8,
+        "schedule": "weekly",
+        "send_hour_utc": 7,
+        "institution": "Aarhus University",
+        "department": "Department of Physics and Astronomy",
+        "tagline": "Weekly astronomy reading for AU students",
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "github_repo": "",
+        "max_papers": 4 if reading_mode == "biggest_only" else 6,
+        "min_score": 6 if reading_mode == "biggest_only" else 4,
+    }
+    return config
+
+
 def render_mini_setup() -> None:
     """Render a separate mini setup flow for students without ORCID."""
     st.markdown("## Mini setup — no ORCID")
@@ -508,6 +676,78 @@ Replace the cron line in <code>.github/workflows/digest.yml</code> with:
 </div>
 """,
         unsafe_allow_html=True,
+    )
+
+
+def render_au_student_setup() -> None:
+    """Render the hidden AU-student setup flow."""
+    st.markdown("## AU astronomy student setup")
+    st.markdown(
+        "Hidden lightweight setup for Aarhus astronomy students. Enter the student's name and email, then pick the astronomy areas they should follow."
+    )
+
+    student_name = st.text_input(
+        "Student name",
+        placeholder="Astronomy student",
+        key="au_student_name",
+    )
+    student_email = st.text_input(
+        "Student email",
+        placeholder="student@post.au.dk",
+        key="au_student_email",
+    )
+
+    selected_tracks = st.multiselect(
+        "Astronomy interests",
+        options=list(AU_STUDENT_TRACK_LABELS.keys()),
+        default=list(AU_STUDENT_TRACK_LABELS.keys()),
+        format_func=lambda key: AU_STUDENT_TRACK_LABELS[key],
+        help="These tracks are biased toward readable and important papers for students.",
+    )
+
+    reading_mode = st.radio(
+        "Weekly style",
+        options=["simple_and_important", "biggest_only"],
+        format_func=lambda mode: {
+            "simple_and_important": "Simple + important",
+            "biggest_only": "Only the biggest papers",
+        }[mode],
+        horizontal=True,
+    )
+
+    st.markdown("**Always included on top of the selected tracks**")
+    st.caption(
+        "AU Astronomy is included for every student digest: AU astronomy papers, AU-run telescope keywords, and AU student-space projects."
+    )
+    st.caption(
+        f"`{AU_STUDENT_ALWAYS_TAG}` is preselected here as a visible tag, and it stays included for every student even if someone unticks it."
+    )
+
+    if not student_email.strip():
+        st.info("Enter an email to generate the AU-student config.")
+        return
+    if not selected_tracks:
+        st.info("Pick at least one astronomy area.")
+        return
+
+    config = _build_au_student_config(student_name, student_email, selected_tracks, reading_mode)
+    config_yaml = yaml.dump(
+        config, default_flow_style=False, sort_keys=False, allow_unicode=True
+    )
+
+    st.markdown("### AU student config.yaml")
+    st.code(config_yaml, language="yaml")
+    st.caption(
+        "This mode is designed for a shared AU-student digest preset. It includes the recipient email directly in config.yaml."
+    )
+
+    st.download_button(
+        label="📥 Download AU student config.yaml",
+        data=config_yaml,
+        file_name="config.yaml",
+        mime="text/yaml",
+        type="primary",
+        use_container_width=True,
     )
 
 
@@ -2129,6 +2369,11 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+hidden_setup_mode = str(st.query_params.get("setup", "")).strip().lower()
+if hidden_setup_mode == "au_students":
+    render_au_student_setup()
+    st.stop()
 
 setup_mode = st.radio(
     "Setup mode",

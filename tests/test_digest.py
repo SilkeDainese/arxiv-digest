@@ -219,7 +219,10 @@ class TestLoadConfig:
         )
         with patch.object(d, "CONFIG_PATH", config_file):
             cfg = d.load_config()
-        assert cfg["colleagues"]["people"] == ["Alice", "Bob"]
+        assert cfg["colleagues"]["people"] == [
+            {"name": "Alice", "match": ["Alice"]},
+            {"name": "Bob", "match": ["Bob"]},
+        ]
         assert cfg["colleagues"]["institutions"] == []
 
     def test_recipient_email_env_override(self, tmp_config_file):
@@ -245,6 +248,28 @@ class TestLoadConfig:
         with patch.object(d, "CONFIG_PATH", config_file):
             cfg = d.load_config()
         assert "institutions" in cfg["colleagues"]
+
+    def test_colleague_people_support_optional_note(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "keywords": {},
+                    "colleagues": {
+                        "people": [
+                            {
+                                "name": "Alice",
+                                "match": ["Smith, A"],
+                                "note": "Teaches stars",
+                            }
+                        ]
+                    },
+                }
+            )
+        )
+        with patch.object(d, "CONFIG_PATH", config_file):
+            cfg = d.load_config()
+        assert cfg["colleagues"]["people"][0]["note"] == "Teaches stars"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -769,6 +794,7 @@ class TestRenderHtml:
         p = make_paper(
             id="col1",
             colleague_matches=["Alice"],
+            colleague_details=[{"name": "Alice", "note": "Teaches stars"}],
             relevance_score=7,
             plain_summary="",
             why_interesting="",
@@ -783,6 +809,7 @@ class TestRenderHtml:
         html = render_html([], [p], config, "March 01, 2025")
         assert "Alice" in html
         assert "Colleague news" in html
+        assert "Teaches stars" in html
 
     def test_renders_own_papers_section(self):
         config = make_config()

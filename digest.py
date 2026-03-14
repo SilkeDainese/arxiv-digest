@@ -126,6 +126,9 @@ def load_config() -> dict[str, Any]:
     elif isinstance(cfg["colleagues"], dict):
         cfg["colleagues"].setdefault("people", [])
         cfg["colleagues"].setdefault("institutions", [])
+    cfg["colleagues"]["people"] = _normalise_colleague_people(
+        cfg["colleagues"].get("people", [])
+    )
 
     # ── Environment overrides (env var wins, config.yaml as fallback) ──
     cfg["recipient_email"] = os.environ.get("RECIPIENT_EMAIL", "").strip() or cfg.get("recipient_email", "")
@@ -173,6 +176,41 @@ def save_feedback_stats(stats: dict[str, Any]) -> None:
     """Persist feedback-derived keyword preferences to disk."""
     with open(FEEDBACK_STATS_PATH, "w") as f:
         json.dump(stats, f, indent=2)
+
+
+def _normalise_colleague_people(people: Any) -> list[dict[str, Any]]:
+    """Normalise colleague entries to dicts with name/match/note fields."""
+    normalised: list[dict[str, Any]] = []
+    for person in people or []:
+        if isinstance(person, str):
+            clean_name = person.strip()
+            if clean_name:
+                normalised.append({"name": clean_name, "match": [clean_name]})
+            continue
+        if not isinstance(person, dict):
+            continue
+        name = str(person.get("name", "")).strip()
+        matches = person.get("match", [])
+        if isinstance(matches, str):
+            match_list = [matches.strip()] if matches.strip() else []
+        else:
+            match_list = [
+                str(match).strip()
+                for match in matches
+                if str(match).strip()
+            ]
+        if not match_list and name:
+            match_list = [name]
+        if not name and match_list:
+            name = match_list[0]
+        if not name:
+            continue
+        entry = {"name": name, "match": list(dict.fromkeys(match_list))}
+        note = str(person.get("note", "")).strip()
+        if note:
+            entry["note"] = note
+        normalised.append(entry)
+    return normalised
 
 
 def _keyword_token_forms(token: str) -> set[str]:
@@ -487,11 +525,27 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
 
             # Check colleagues — people matches
             colleague_flag = []
+            colleague_details: list[dict[str, str]] = []
             for author in authors:
                 for colleague in config["colleagues"]["people"]:
                     for pattern in colleague.get("match", []):
                         if pattern.lower() in author.lower():
-                            colleague_flag.append(colleague["name"])
+                            colleague_name = colleague["name"]
+                            if colleague_name not in colleague_flag:
+                                colleague_flag.append(colleague_name)
+                            detail = {"name": colleague_name}
+                            note = str(colleague.get("note", "")).strip()
+                            if note and not any(
+                                existing.get("name") == colleague_name
+                                for existing in colleague_details
+                            ):
+                                detail["note"] = note
+                                colleague_details.append(detail)
+                            elif not note and not any(
+                                existing.get("name") == colleague_name
+                                for existing in colleague_details
+                            ):
+                                colleague_details.append(detail)
                             break
 
             # Check colleagues — institutional matches (arXiv affiliation XML + abstract fallback)
@@ -507,7 +561,12 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
             for inst in config["colleagues"].get("institutions", []):
                 inst_lower = inst.lower()
                 if inst_lower in affiliation_text or inst_lower in text_lower:
-                    colleague_flag.append(inst)
+                    if inst not in colleague_flag:
+                        colleague_flag.append(inst)
+                    if not any(
+                        existing.get("name") == inst for existing in colleague_details
+                    ):
+                        colleague_details.append({"name": inst})
 
             # Check if this is the user's own paper
             is_own_paper = False
@@ -533,6 +592,7 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "url": f"https://arxiv.org/abs/{arxiv_id}",
                 "known_authors": known_flag,
                 "colleague_matches": colleague_flag,
+                "colleague_details": colleague_details,
                 "is_own_paper": is_own_paper,
                 "matched_keywords": matched_keywords,
                 "keyword_hits_raw": kw_hits_raw,
@@ -1022,7 +1082,21 @@ def _render_colleague_section(colleague_papers: list[dict[str, Any]]) -> str:
 
     postits = ""
     for p in unique_colleagues:
-        names = ", ".join(set(p["colleague_matches"]))
+        details = p.get("colleague_details") or [
+            {"name": name} for name in dict.fromkeys(p.get("colleague_matches", []))
+        ]
+        names = ", ".join(detail["name"] for detail in details if detail.get("name"))
+        notes = [
+            f"{detail['name']} — {detail['note']}"
+            for detail in details
+            if detail.get("name") and detail.get("note")
+        ]
+        notes_html = ""
+        if notes:
+            notes_html = "".join(
+                f'<div style="font-family:\'IBM Plex Sans\',sans-serif;font-size:11px;color:{UMBER};line-height:1.45;margin-top:4px">{note}</div>'
+                for note in notes[:2]
+            )
         authors_short = ", ".join(p["authors"][:3])
         if len(p["authors"]) > 3:
             authors_short += f" +{len(p['authors'])-3}"
@@ -1034,6 +1108,7 @@ def _render_colleague_section(colleague_papers: list[dict[str, Any]]) -> str:
               <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{p['title'][:80]}{'...' if len(p['title']) > 80 else ''}</a>
             </div>
             <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY}">{authors_short}</div>
+            {notes_html}
           </td></tr>
         </table>"""
 
