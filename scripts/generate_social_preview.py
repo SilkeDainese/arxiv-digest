@@ -189,6 +189,8 @@ HTML = f"""<!DOCTYPE html>
     .card {{
       align-self: center;
       justify-self: stretch;
+      display: flex;
+      flex-direction: column;
       background: rgba(246, 245, 242, 0.96);
       color: var(--ash-black);
       border: 1px solid rgba(246, 245, 242, 0.6);
@@ -286,6 +288,7 @@ HTML = f"""<!DOCTYPE html>
       gap: 12px;
       flex-wrap: wrap;
       margin-top: 8px;
+      margin-bottom: 18px;
     }}
 
     .meta-chip {{
@@ -298,16 +301,16 @@ HTML = f"""<!DOCTYPE html>
     }}
 
     .footer {{
-      position: absolute;
-      left: 28px;
-      right: 28px;
-      bottom: 22px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid rgba(47, 79, 62, 0.14);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px 16px;
+      align-items: end;
       font-family: var(--font-mono);
-      font-size: 13px;
-      letter-spacing: 0.08em;
+      font-size: 12px;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--warm-grey);
     }}
@@ -315,6 +318,11 @@ HTML = f"""<!DOCTYPE html>
     .footer strong {{
       color: var(--pine);
       font-weight: 500;
+    }}
+
+    .footer-right {{
+      text-align: right;
+      color: var(--pine);
     }}
   </style>
 </head>
@@ -373,7 +381,7 @@ HTML = f"""<!DOCTYPE html>
         </div>
         <div class="footer">
           <div>Created by <strong>Silke S. Dainese</strong></div>
-          <div>github.com/SilkeDainese/arxiv-digest</div>
+          <div class="footer-right">SilkeDainese/arxiv-digest</div>
         </div>
       </aside>
     </section>
