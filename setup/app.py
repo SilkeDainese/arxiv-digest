@@ -368,9 +368,14 @@ def draft_research_description(keywords: dict[str, int]) -> str:
 
 
 def _get_anthropic_key() -> str | None:
-    """Return Anthropic API key from Streamlit secrets or environment, or None."""
+    """Return Anthropic API key: session state (user-provided) → secrets → env → None."""
+    user_key = st.session_state.get("user_anthropic_key", "").strip()
+    if user_key:
+        return user_key
     try:
-        return st.secrets.get("ANTHROPIC_API_KEY")
+        key = st.secrets.get("ANTHROPIC_API_KEY")
+        if key:
+            return key
     except Exception:
         pass
     return os.environ.get("ANTHROPIC_API_KEY")
@@ -574,7 +579,24 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── AI assist toggle ──
+# ── Optional API key + AI assist toggle ──
+with st.expander("✨ Enable AI features (optional)"):
+    st.markdown(
+        "Paste your [Anthropic API key](https://console.anthropic.com/settings/keys) to unlock "
+        "AI-powered keyword scoring and auto-drafted research descriptions. "
+        "Your key is only used during this session and never stored."
+    )
+    st.text_input(
+        "Anthropic API key",
+        type="password",
+        placeholder="sk-ant-...",
+        key="user_anthropic_key",
+        label_visibility="collapsed",
+        help="Optional — without a key the wizard still works, using pattern matching instead of AI.",
+    )
+    if st.session_state.get("user_anthropic_key"):
+        st.success("API key set — AI features enabled.")
+
 ai_assist = st.toggle(
     "✨ AI-assisted setup",
     value=True,
