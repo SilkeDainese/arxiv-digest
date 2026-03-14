@@ -945,14 +945,23 @@ class TestEmailSending:
             clear=True,
         ):
             with patch("digest.smtplib.SMTP") as smtp_cls:
-                send_email("<p>hi</p>", 2, "March 01, 2025", config)
+                ok = send_email("<p>hi</p>", 2, "March 01, 2025", config)
 
         smtp_instance = smtp_cls.return_value.__enter__.return_value
+        assert ok is True
         smtp_instance.sendmail.assert_called_once()
         send_args = smtp_instance.sendmail.call_args[0]
         assert send_args[0] == "sender@example.com"
         assert send_args[1] == ["a@example.com", "b@example.com"]
         assert "To: a@example.com, b@example.com" in send_args[2]
+
+    def test_send_email_returns_false_without_recipient(self, capsys):
+        config = make_config(recipient_email="")
+
+        ok = send_email("<p>hi</p>", 2, "March 01, 2025", config)
+
+        assert ok is False
+        assert "No recipient email configured" in capsys.readouterr().out
 
     def test_send_via_relay_requires_explicit_token(self, capsys):
         with patch.dict(os.environ, {}, clear=True):
@@ -999,6 +1008,30 @@ class TestEmailSending:
                 )
 
         assert ok is True
+
+
+class TestMainExitCodes:
+    def test_main_exits_nonzero_when_email_delivery_fails(self, tmp_path, capsys):
+        fake_script = tmp_path / "digest.py"
+        fake_script.write_text("# test placeholder\n")
+
+        with patch.object(d, "__file__", str(fake_script)):
+            with patch.object(d, "load_config", return_value=make_config()):
+                with patch.object(d, "fetch_arxiv_papers", return_value=[]):
+                    with patch.object(d, "ingest_feedback_from_github", return_value={}):
+                        with patch.object(d, "apply_feedback_bias"):
+                            with patch.object(d, "update_keyword_stats"):
+                                with patch.object(d, "extract_own_papers", return_value=[]):
+                                    with patch.object(d, "extract_colleague_papers", return_value=[]):
+                                        with patch.object(d, "pre_filter", return_value=[]):
+                                            with patch.object(d, "analyse_papers", return_value=([], "keywords")):
+                                                with patch.object(d, "render_html", return_value="<p>hi</p>"):
+                                                    with patch.object(d, "send_email", return_value=False):
+                                                        with pytest.raises(SystemExit, match="1"):
+                                                            d.main()
+
+        out = capsys.readouterr().out
+        assert "Email delivery failed." in out
 
 
 # ─────────────────────────────────────────────────────────────

@@ -1612,7 +1612,7 @@ def _send_via_smtp(recipients: list[str], subject: str, html: str,
 
 
 def send_email(html: str, paper_count: int, date_str: str, config: dict[str, Any],
-               papers: list[dict[str, Any]] | None = None) -> None:
+               papers: list[dict[str, Any]] | None = None) -> bool:
     """Send the digest email via relay (default) or direct SMTP.
 
     Uses the shared relay service unless SMTP_USER and SMTP_PASSWORD are set
@@ -1621,7 +1621,7 @@ def send_email(html: str, paper_count: int, date_str: str, config: dict[str, Any
     recipients = _parse_recipient_emails(config.get("recipient_email"))
     if not recipients:
         print("⚠️  No recipient email configured — skipping email send.")
-        return
+        return False
 
     digest_name = config["digest_name"]
     paper_word = "paper" if paper_count == 1 else "papers"
@@ -1633,12 +1633,11 @@ def send_email(html: str, paper_count: int, date_str: str, config: dict[str, Any
     smtp_password = os.environ.get("SMTP_PASSWORD", "").strip() or os.environ.get("GMAIL_APP_PASSWORD", "").strip()
 
     if smtp_user and smtp_password:
-        _send_via_smtp(recipients, subject, html, plain_text,
-                       smtp_user, smtp_password,
-                       config["smtp_server"], config["smtp_port"],
-                       digest_name)
-    else:
-        _send_via_relay(recipients, subject, html, plain_text)
+        return _send_via_smtp(recipients, subject, html, plain_text,
+                              smtp_user, smtp_password,
+                              config["smtp_server"], config["smtp_port"],
+                              digest_name)
+    return _send_via_relay(recipients, subject, html, plain_text)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1706,7 +1705,9 @@ def main() -> None:
         print("   Opened in your browser. No email sent.")
     else:
         print("\n📧 Sending email...")
-        send_email(html, total_count, date_str, config, papers=final_papers)
+        if not send_email(html, total_count, date_str, config, papers=final_papers):
+            print("\n❌ Email delivery failed.")
+            raise SystemExit(1)
 
     print("\n✨ Done!\n")
 
