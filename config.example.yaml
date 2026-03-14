@@ -63,6 +63,11 @@ colleagues:
 # "in_depth"   — wider net, more papers, lower threshold
 digest_mode: "highlights"
 
+# ── Recipient Email View ───────────────────────
+# "deep_read"  — full cards with expanded context (default)
+# "5_min_skim" — top 3 papers with one-line summaries
+recipient_view_mode: "deep_read"
+
 # ── Settings ───────────────────────────────────
 days_back: 4          # how many days to look back (4 covers weekend gaps)
 # max_papers and min_score are auto-set by digest_mode, but you can override:

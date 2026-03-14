@@ -17,6 +17,7 @@ If you have suggestions, open an issue or email me. I cannot promise to implemen
 ### 1. Generate your config
 
 Visit **[arxiv-digest-setup.streamlit.app](https://arxiv-digest-setup.streamlit.app)** and fill in:
+
 - Your name and research description
 - Keywords with importance weights (1-10)
 - arXiv categories to monitor
@@ -53,7 +54,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 
 Go to **Settings → Actions → General → Workflow permissions** and select **"Read and write permissions"**. This lets the digest save keyword tracking stats between runs.
 
-### 6. Done!
+### 6. Done
 
 Your digest runs automatically Mon/Wed/Fri at 9am Danish time (07:00 UTC).
 
@@ -70,6 +71,7 @@ To trigger it manually: **Actions → arXiv Digest → Run workflow**.
 3. Use the App Password as `SMTP_PASSWORD`
 
 Config settings (default):
+
 ```yaml
 smtp_server: "smtp.gmail.com"
 smtp_port: 587
@@ -81,6 +83,7 @@ smtp_port: 587
 2. Use the App Password as `SMTP_PASSWORD`
 
 Config settings:
+
 ```yaml
 smtp_server: "smtp.office365.com"
 smtp_port: 587
@@ -122,6 +125,7 @@ Key fields:
 |-------|-------------|
 | `research_context` | Free-text description of your research (used by AI scoring) |
 | `keywords` | Dictionary of `keyword: weight` pairs (1-10) |
+| `recipient_view_mode` | `deep_read` (full cards) or `5_min_skim` (top 3 one-line summaries) |
 | `categories` | arXiv categories to monitor |
 | `research_authors` | Authors whose papers get a relevance boost |
 | `colleagues` | People/institutions whose papers always show |
@@ -137,6 +141,13 @@ Every digest email includes self-service links:
 - **Pause** → links to the Actions tab (disable the workflow)
 - **Re-run setup** → opens the setup wizard
 - **Delete** → links to repo Settings (Danger Zone → Delete repository)
+
+Each paper card can also include quick feedback arrows when `github_repo` is set:
+
+- **↑** = relevant (more like this)
+- **↓** = not relevant (less like this)
+
+These create labeled GitHub issues (`digest-feedback`) that are ingested automatically to nudge future ranking.
 
 ### How to Unsubscribe
 

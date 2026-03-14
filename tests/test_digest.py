@@ -28,8 +28,10 @@ import digest as d
 from digest import (
     _build_scoring_prompt,
     _default_analysis,
+    _parse_feedback_issue,
     _fallback_analyse,
     _filter_and_sort,
+    apply_feedback_bias,
     extract_colleague_papers,
     extract_own_papers,
     load_keyword_stats,
@@ -43,6 +45,7 @@ from digest import (
 # ─────────────────────────────────────────────────────────────
 #  FIXTURES
 # ─────────────────────────────────────────────────────────────
+
 
 def make_paper(**overrides):
     """Return a minimal valid paper dict with sensible defaults."""
@@ -84,6 +87,7 @@ def make_config(**overrides):
         "smtp_server": "smtp.gmail.com",
         "smtp_port": 587,
         "digest_mode": "highlights",
+        "recipient_view_mode": "deep_read",
         "self_match": [],
         "recipient_email": "test@example.com",
     }
@@ -115,19 +119,25 @@ def tmp_config_file(tmp_path):
 #  load_config
 # ─────────────────────────────────────────────────────────────
 
-class TestLoadConfig:
 
+class TestLoadConfig:
     def test_raises_when_no_config_files(self, tmp_path):
         with patch.object(d, "CONFIG_PATH", tmp_path / "config.yaml"):
-            with patch.object(d, "CONFIG_EXAMPLE_PATH", tmp_path / "config.example.yaml"):
+            with patch.object(
+                d, "CONFIG_EXAMPLE_PATH", tmp_path / "config.example.yaml"
+            ):
                 with pytest.raises(FileNotFoundError, match="setup wizard"):
                     d.load_config()
 
     def test_loads_config_yaml_over_example(self, tmp_path):
         config_file = tmp_path / "config.yaml"
-        config_file.write_text(yaml.dump({"keywords": {"stars": 5}, "recipient_email": "a@b.com"}))
+        config_file.write_text(
+            yaml.dump({"keywords": {"stars": 5}, "recipient_email": "a@b.com"})
+        )
         example_file = tmp_path / "config.example.yaml"
-        example_file.write_text(yaml.dump({"keywords": {"planets": 3}, "recipient_email": "x@y.com"}))
+        example_file.write_text(
+            yaml.dump({"keywords": {"planets": 3}, "recipient_email": "x@y.com"})
+        )
         with patch.object(d, "CONFIG_PATH", config_file):
             with patch.object(d, "CONFIG_EXAMPLE_PATH", example_file):
                 cfg = d.load_config()
@@ -142,6 +152,16 @@ class TestLoadConfig:
         assert cfg["days_back"] == 3
         assert cfg["smtp_server"] == "smtp.gmail.com"
         assert cfg["smtp_port"] == 587
+        assert cfg["recipient_view_mode"] == "deep_read"
+
+    def test_recipient_view_mode_typo_normalized(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            yaml.dump({"keywords": {}, "recipient_view_mode": "skim"})
+        )
+        with patch.object(d, "CONFIG_PATH", config_file):
+            cfg = d.load_config()
+        assert cfg["recipient_view_mode"] == "5_min_skim"
 
     def test_highlights_mode_defaults(self, tmp_path):
         config_file = tmp_path / "config.yaml"
@@ -170,7 +190,9 @@ class TestLoadConfig:
     def test_colleagues_list_backward_compat(self, tmp_path):
         """Old configs had colleagues as a flat list — should become people/institutions dict."""
         config_file = tmp_path / "config.yaml"
-        config_file.write_text(yaml.dump({"keywords": {}, "colleagues": ["Alice", "Bob"]}))
+        config_file.write_text(
+            yaml.dump({"keywords": {}, "colleagues": ["Alice", "Bob"]})
+        )
         with patch.object(d, "CONFIG_PATH", config_file):
             cfg = d.load_config()
         assert cfg["colleagues"]["people"] == ["Alice", "Bob"]
@@ -193,7 +215,9 @@ class TestLoadConfig:
     def test_colleagues_dict_gets_defaults(self, tmp_path):
         """A colleagues dict missing the 'institutions' key gets it defaulted."""
         config_file = tmp_path / "config.yaml"
-        config_file.write_text(yaml.dump({"keywords": {}, "colleagues": {"people": []}}))
+        config_file.write_text(
+            yaml.dump({"keywords": {}, "colleagues": {"people": []}})
+        )
         with patch.object(d, "CONFIG_PATH", config_file):
             cfg = d.load_config()
         assert "institutions" in cfg["colleagues"]
@@ -203,8 +227,8 @@ class TestLoadConfig:
 #  Keyword score normalisation
 # ─────────────────────────────────────────────────────────────
 
-class TestKeywordNormalisation:
 
+class TestKeywordNormalisation:
     def test_keyword_hits_normalised_to_100(self):
         """A paper matching all keywords should get keyword_hits = 100."""
         config = make_config(keywords={"stellar rotation": 8, "vsini": 6})
@@ -234,8 +258,8 @@ class TestKeywordNormalisation:
 #  pre_filter
 # ─────────────────────────────────────────────────────────────
 
-class TestPreFilter:
 
+class TestPreFilter:
     def test_paper_with_keyword_hits_included(self):
         p = make_paper(keyword_hits=25.0)
         result = pre_filter([p])
@@ -278,8 +302,8 @@ class TestPreFilter:
 #  extract_colleague_papers / extract_own_papers
 # ─────────────────────────────────────────────────────────────
 
-class TestExtractPapers:
 
+class TestExtractPapers:
     def test_extract_colleague_papers_basic(self):
         p1 = make_paper(id="1", colleague_matches=["Alice"])
         p2 = make_paper(id="2", colleague_matches=[])
@@ -309,8 +333,8 @@ class TestExtractPapers:
 #  _default_analysis
 # ─────────────────────────────────────────────────────────────
 
-class TestDefaultAnalysis:
 
+class TestDefaultAnalysis:
     def test_zero_keyword_hits_gives_score_1(self):
         p = make_paper(keyword_hits=0.0)
         r = _default_analysis(p)
@@ -358,9 +382,18 @@ class TestDefaultAnalysis:
     def test_required_fields_present(self):
         p = make_paper(keyword_hits=50.0)
         r = _default_analysis(p)
-        for key in ["relevance_score", "plain_summary", "why_interesting", "emoji",
-                    "highlight_phrase", "kw_tags", "method_tags", "is_new_catalog",
-                    "cite_worthy", "new_result"]:
+        for key in [
+            "relevance_score",
+            "plain_summary",
+            "why_interesting",
+            "emoji",
+            "highlight_phrase",
+            "kw_tags",
+            "method_tags",
+            "is_new_catalog",
+            "cite_worthy",
+            "new_result",
+        ]:
             assert key in r, f"Missing field: {key}"
 
 
@@ -368,8 +401,8 @@ class TestDefaultAnalysis:
 #  _fallback_analyse
 # ─────────────────────────────────────────────────────────────
 
-class TestFallbackAnalyse:
 
+class TestFallbackAnalyse:
     def test_empty_papers_returns_empty(self):
         config = make_config(min_score=1, max_papers=10)
         result = _fallback_analyse([], config)
@@ -413,8 +446,8 @@ class TestFallbackAnalyse:
 #  _filter_and_sort
 # ─────────────────────────────────────────────────────────────
 
-class TestFilterAndSort:
 
+class TestFilterAndSort:
     def test_empty_input_returns_empty(self):
         config = make_config(min_score=5, max_papers=6)
         assert _filter_and_sort([], config) == []
@@ -459,8 +492,8 @@ class TestFilterAndSort:
 #  _build_scoring_prompt
 # ─────────────────────────────────────────────────────────────
 
-class TestBuildScoringPrompt:
 
+class TestBuildScoringPrompt:
     def test_prompt_contains_title(self):
         config = make_config()
         p = make_paper(title="Stellar Rotation in the Pleiades")
@@ -475,7 +508,7 @@ class TestBuildScoringPrompt:
 
     def test_researcher_name_curly_braces_sanitized(self):
         """Curly braces in researcher_name must be stripped to prevent f-string corruption."""
-        config = make_config(researcher_name='Test{injection}')
+        config = make_config(researcher_name="Test{injection}")
         p = make_paper()
         prompt = _build_scoring_prompt(p, config)
         assert "{" not in prompt or "{{" not in prompt  # sanitized
@@ -516,8 +549,8 @@ class TestBuildScoringPrompt:
 #  update_keyword_stats (isolated — no disk side effects)
 # ─────────────────────────────────────────────────────────────
 
-class TestUpdateKeywordStats:
 
+class TestUpdateKeywordStats:
     def test_new_keyword_initialised(self, tmp_stats_path):
         config = make_config(keywords={"stellar rotation": 8})
         update_keyword_stats([], config)
@@ -574,8 +607,8 @@ class TestUpdateKeywordStats:
 #  render_html — smoke tests
 # ─────────────────────────────────────────────────────────────
 
-class TestRenderHtml:
 
+class TestRenderHtml:
     def test_renders_without_crash_empty_papers(self):
         config = make_config()
         html = render_html([], [], config, "March 01, 2025")
@@ -584,31 +617,144 @@ class TestRenderHtml:
 
     def test_renders_with_one_paper(self):
         config = make_config()
-        p = make_paper(relevance_score=7, plain_summary="A nice summary.",
-                       why_interesting="Related to your work.", highlight_phrase="Cool result",
-                       emoji="🌟", kw_tags=["rotation"], method_tags=["spectroscopy"],
-                       is_new_catalog=False, cite_worthy=False, new_result=None)
+        p = make_paper(
+            relevance_score=7,
+            plain_summary="A nice summary.",
+            why_interesting="Related to your work.",
+            highlight_phrase="Cool result",
+            emoji="🌟",
+            kw_tags=["rotation"],
+            method_tags=["spectroscopy"],
+            is_new_catalog=False,
+            cite_worthy=False,
+            new_result=None,
+        )
         html = render_html([p], [], config, "March 01, 2025")
         assert p["title"] in html
         assert "7" in html  # score
-        assert "A nice summary." in html
+        assert "What changed:" in html
+
+    def test_skim_mode_shows_top_three_only(self):
+        config = make_config(recipient_view_mode="5_min_skim")
+        papers = [
+            make_paper(
+                id="1",
+                title="Paper 1",
+                relevance_score=9,
+                plain_summary="One.",
+                why_interesting="A",
+                highlight_phrase="",
+                emoji="",
+                kw_tags=[],
+                method_tags=[],
+                is_new_catalog=False,
+                cite_worthy=False,
+                new_result=None,
+            ),
+            make_paper(
+                id="2",
+                title="Paper 2",
+                relevance_score=8,
+                plain_summary="Two.",
+                why_interesting="B",
+                highlight_phrase="",
+                emoji="",
+                kw_tags=[],
+                method_tags=[],
+                is_new_catalog=False,
+                cite_worthy=False,
+                new_result=None,
+            ),
+            make_paper(
+                id="3",
+                title="Paper 3",
+                relevance_score=7,
+                plain_summary="Three.",
+                why_interesting="C",
+                highlight_phrase="",
+                emoji="",
+                kw_tags=[],
+                method_tags=[],
+                is_new_catalog=False,
+                cite_worthy=False,
+                new_result=None,
+            ),
+            make_paper(
+                id="4",
+                title="Paper 4",
+                relevance_score=6,
+                plain_summary="Four.",
+                why_interesting="D",
+                highlight_phrase="",
+                emoji="",
+                kw_tags=[],
+                method_tags=[],
+                is_new_catalog=False,
+                cite_worthy=False,
+                new_result=None,
+            ),
+        ]
+        html = render_html(papers, [], config, "March 01, 2025")
+        assert "5-minute skim" in html
+        assert "Paper 1" in html and "Paper 2" in html and "Paper 3" in html
+        assert "Paper 4" not in html
+
+    def test_feedback_links_use_arrows(self):
+        config = make_config(github_repo="user/my-digest")
+        p = make_paper(
+            relevance_score=7,
+            plain_summary="A nice summary.",
+            why_interesting="Related to your work.",
+            highlight_phrase="Cool result",
+            emoji="🌟",
+            kw_tags=["rotation"],
+            method_tags=["spectroscopy"],
+            is_new_catalog=False,
+            cite_worthy=False,
+            new_result=None,
+            matched_keywords=["stellar rotation"],
+        )
+        html = render_html([p], [], config, "March 01, 2025")
+        assert "&#x2191;" in html
+        assert "&#x2193;" in html
+        assert "digest-feedback" in html
 
     def test_renders_colleague_section(self):
         config = make_config()
-        p = make_paper(id="col1", colleague_matches=["Alice"], relevance_score=7,
-                       plain_summary="", why_interesting="", highlight_phrase="",
-                       emoji="", kw_tags=[], method_tags=[], is_new_catalog=False,
-                       cite_worthy=False, new_result=None)
+        p = make_paper(
+            id="col1",
+            colleague_matches=["Alice"],
+            relevance_score=7,
+            plain_summary="",
+            why_interesting="",
+            highlight_phrase="",
+            emoji="",
+            kw_tags=[],
+            method_tags=[],
+            is_new_catalog=False,
+            cite_worthy=False,
+            new_result=None,
+        )
         html = render_html([], [p], config, "March 01, 2025")
         assert "Alice" in html
         assert "Colleague news" in html
 
     def test_renders_own_papers_section(self):
         config = make_config()
-        p = make_paper(id="own1", is_own_paper=True, relevance_score=9,
-                       plain_summary="", why_interesting="", highlight_phrase="",
-                       emoji="", kw_tags=[], method_tags=[], is_new_catalog=False,
-                       cite_worthy=False, new_result=None)
+        p = make_paper(
+            id="own1",
+            is_own_paper=True,
+            relevance_score=9,
+            plain_summary="",
+            why_interesting="",
+            highlight_phrase="",
+            emoji="",
+            kw_tags=[],
+            method_tags=[],
+            is_new_catalog=False,
+            cite_worthy=False,
+            new_result=None,
+        )
         html = render_html([], [], config, "March 01, 2025", own_papers=[p])
         assert "Congratulations" in html
         assert p["title"] in html
@@ -625,13 +771,22 @@ class TestRenderHtml:
 
     def test_scoring_method_keywords_fallback_shows_warning(self):
         config = make_config()
-        html = render_html([], [], config, "March 01, 2025", scoring_method="keywords_fallback")
+        html = render_html(
+            [], [], config, "March 01, 2025", scoring_method="keywords_fallback"
+        )
         assert "AI scoring unavailable" in html
 
     def test_scoring_method_keywords_shows_notice(self):
         config = make_config()
         html = render_html([], [], config, "March 01, 2025", scoring_method="keywords")
         assert "keyword matching" in html
+
+    def test_scoring_method_gemini_rate_limited_shows_try_later(self):
+        config = make_config()
+        html = render_html(
+            [], [], config, "March 01, 2025", scoring_method="gemini_rate_limited"
+        )
+        assert "Gemini free-tier limit reached" in html
 
     def test_github_repo_generates_self_service_links(self):
         config = make_config(github_repo="user/my-digest")
@@ -642,12 +797,32 @@ class TestRenderHtml:
     def test_top_pick_label_on_first_paper_only(self):
         config = make_config()
         papers = [
-            make_paper(id="1", relevance_score=9, plain_summary="", why_interesting="",
-                       highlight_phrase="", emoji="", kw_tags=[], method_tags=[],
-                       is_new_catalog=False, cite_worthy=False, new_result=None),
-            make_paper(id="2", relevance_score=7, plain_summary="", why_interesting="",
-                       highlight_phrase="", emoji="", kw_tags=[], method_tags=[],
-                       is_new_catalog=False, cite_worthy=False, new_result=None),
+            make_paper(
+                id="1",
+                relevance_score=9,
+                plain_summary="",
+                why_interesting="",
+                highlight_phrase="",
+                emoji="",
+                kw_tags=[],
+                method_tags=[],
+                is_new_catalog=False,
+                cite_worthy=False,
+                new_result=None,
+            ),
+            make_paper(
+                id="2",
+                relevance_score=7,
+                plain_summary="",
+                why_interesting="",
+                highlight_phrase="",
+                emoji="",
+                kw_tags=[],
+                method_tags=[],
+                is_new_catalog=False,
+                cite_worthy=False,
+                new_result=None,
+            ),
         ]
         html = render_html(papers, [], config, "March 01, 2025")
         assert html.count("Top pick") == 1
@@ -655,9 +830,18 @@ class TestRenderHtml:
     def test_score_bar_handles_out_of_range_scores(self):
         """render_html must not crash if AI returns score outside 1-10."""
         config = make_config()
-        p = make_paper(relevance_score=11, plain_summary="", why_interesting="",
-                       highlight_phrase="", emoji="", kw_tags=[], method_tags=[],
-                       is_new_catalog=False, cite_worthy=False, new_result=None)
+        p = make_paper(
+            relevance_score=11,
+            plain_summary="",
+            why_interesting="",
+            highlight_phrase="",
+            emoji="",
+            kw_tags=[],
+            method_tags=[],
+            is_new_catalog=False,
+            cite_worthy=False,
+            new_result=None,
+        )
         # Should not raise
         html = render_html([p], [], config, "March 01, 2025")
         assert "<html" in html
@@ -673,8 +857,8 @@ class TestRenderHtml:
 #  analyse_papers — cascade logic (no real API calls)
 # ─────────────────────────────────────────────────────────────
 
-class TestAnalysePapersCascade:
 
+class TestAnalysePapersCascade:
     def test_empty_papers_returns_empty(self):
         config = make_config()
         with patch.dict(os.environ, {}, clear=True):
@@ -685,8 +869,11 @@ class TestAnalysePapersCascade:
     def test_no_api_keys_uses_keyword_fallback(self, tmp_stats_path):
         config = make_config(min_score=1, max_papers=10)
         p = make_paper(keyword_hits=50.0)
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY")}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY")
+        }
         with patch.dict(os.environ, env, clear=True):
             result, method = d.analyse_papers([p], config)
         assert method == "keywords"
@@ -702,13 +889,20 @@ class TestAnalysePapersCascade:
         def fake_gemini(papers, cfg, key):
             for paper in papers:
                 paper["relevance_score"] = 7
-                paper.update({
-                    "plain_summary": "s", "why_interesting": "w",
-                    "highlight_phrase": "h", "emoji": "e",
-                    "kw_tags": [], "method_tags": [],
-                    "is_new_catalog": False, "cite_worthy": False, "new_result": None,
-                })
-            return _filter_and_sort(papers, cfg)
+                paper.update(
+                    {
+                        "plain_summary": "s",
+                        "why_interesting": "w",
+                        "highlight_phrase": "h",
+                        "emoji": "e",
+                        "kw_tags": [],
+                        "method_tags": [],
+                        "is_new_catalog": False,
+                        "cite_worthy": False,
+                        "new_result": None,
+                    }
+                )
+            return _filter_and_sort(papers, cfg), None
 
         env = {"ANTHROPIC_API_KEY": "fake-key", "GEMINI_API_KEY": "fake-gemini-key"}
         with patch.dict(os.environ, env):
@@ -738,8 +932,34 @@ class TestAnalysePapersCascade:
 
 
 # ─────────────────────────────────────────────────────────────
+#  Feedback parsing + bias
+# ─────────────────────────────────────────────────────────────
+
+
+class TestFeedbackHelpers:
+    def test_parse_feedback_issue(self):
+        issue = {
+            "body": "feedback_type: relevant\nmatched_keywords: JWST, transmission spectroscopy\n"
+        }
+        feedback_type, keywords = _parse_feedback_issue(issue)
+        assert feedback_type == "relevant"
+        assert keywords == ["JWST", "transmission spectroscopy"]
+
+    def test_apply_feedback_bias(self):
+        papers = [
+            make_paper(matched_keywords=["JWST", "stellar rotation"], feedback_bias=0),
+            make_paper(id="2", matched_keywords=["other"], feedback_bias=0),
+        ]
+        stats = {"keyword_feedback": {"jwst": 2, "stellar rotation": 1, "other": -1}}
+        apply_feedback_bias(papers, stats)
+        assert papers[0]["feedback_bias"] == 3
+        assert papers[1]["feedback_bias"] == -1
+
+
+# ─────────────────────────────────────────────────────────────
 #  Edge cases: XML parsing in fetch_arxiv_papers (unit-level)
 # ─────────────────────────────────────────────────────────────
+
 
 class TestFetchArxivXmlParsing:
     """
@@ -755,6 +975,7 @@ class TestFetchArxivXmlParsing:
         This is tested by confirming the guard clause exists in the source.
         """
         import inspect
+
         source = inspect.getsource(d.fetch_arxiv_papers)
         assert "except (AttributeError, TypeError, ValueError)" in source
 

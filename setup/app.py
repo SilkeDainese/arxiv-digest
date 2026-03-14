@@ -18,6 +18,7 @@ import streamlit as st
 
 try:
     import anthropic as _anthropic_lib
+
     _ANTHROPIC_AVAILABLE = True
 except ImportError:
     _ANTHROPIC_AVAILABLE = False
@@ -25,6 +26,7 @@ except ImportError:
 try:
     from google import genai as _genai_lib
     from google.genai import types as _genai_types
+
     _GEMINI_AVAILABLE = True
 except ImportError:
     _GEMINI_AVAILABLE = False
@@ -33,7 +35,13 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from brand import PINE, GOLD, CARD_BORDER, WARM_GREY
-from pure_scraper import fetch_orcid_person, fetch_orcid_works, find_au_colleagues, scrape_pure_profile, search_pure_profiles
+from pure_scraper import (
+    fetch_orcid_person,
+    fetch_orcid_works,
+    find_au_colleagues,
+    scrape_pure_profile,
+    search_pure_profiles,
+)
 
 # ─────────────────────────────────────────────────────────────
 #  Page config
@@ -46,7 +54,8 @@ st.set_page_config(
 )
 
 # ── Custom CSS for brand styling ──
-st.markdown(f"""
+st.markdown(
+    f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;600&family=DM+Mono:wght@400&display=swap');
 
@@ -83,7 +92,9 @@ st.markdown(f"""
         margin-right: 8px;
     }}
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 _ORCID_ID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
@@ -203,13 +214,23 @@ ARXIV_CATEGORIES = {
 # Hierarchical grouping for the category picker UI
 ARXIV_GROUPS = {
     "Astrophysics": [
-        "astro-ph.EP", "astro-ph.SR", "astro-ph.GA",
-        "astro-ph.CO", "astro-ph.HE", "astro-ph.IM",
+        "astro-ph.EP",
+        "astro-ph.SR",
+        "astro-ph.GA",
+        "astro-ph.CO",
+        "astro-ph.HE",
+        "astro-ph.IM",
     ],
     "Condensed Matter": [
-        "cond-mat.dis-nn", "cond-mat.mes-hall", "cond-mat.mtrl-sci",
-        "cond-mat.other", "cond-mat.quant-gas", "cond-mat.soft",
-        "cond-mat.stat-mech", "cond-mat.str-el", "cond-mat.supr-con",
+        "cond-mat.dis-nn",
+        "cond-mat.mes-hall",
+        "cond-mat.mtrl-sci",
+        "cond-mat.other",
+        "cond-mat.quant-gas",
+        "cond-mat.soft",
+        "cond-mat.stat-mech",
+        "cond-mat.str-el",
+        "cond-mat.supr-con",
     ],
     "General Relativity & Quantum Cosmology": ["gr-qc"],
     "High Energy Physics": ["hep-ex", "hep-lat", "hep-ph", "hep-th"],
@@ -217,20 +238,48 @@ ARXIV_GROUPS = {
     "Nonlinear Sciences": ["nlin.AO", "nlin.CD", "nlin.CG", "nlin.PS", "nlin.SI"],
     "Nuclear Physics": ["nucl-ex", "nucl-th"],
     "Physics": [
-        "physics.acc-ph", "physics.ao-ph", "physics.atom-ph", "physics.atm-clus",
-        "physics.bio-ph", "physics.chem-ph", "physics.class-ph", "physics.comp-ph",
-        "physics.data-an", "physics.ed-ph", "physics.flu-dyn", "physics.gen-ph",
-        "physics.geo-ph", "physics.hist-ph", "physics.ins-det", "physics.med-ph",
-        "physics.optics", "physics.plasm-ph", "physics.pop-ph", "physics.soc-ph",
+        "physics.acc-ph",
+        "physics.ao-ph",
+        "physics.atom-ph",
+        "physics.atm-clus",
+        "physics.bio-ph",
+        "physics.chem-ph",
+        "physics.class-ph",
+        "physics.comp-ph",
+        "physics.data-an",
+        "physics.ed-ph",
+        "physics.flu-dyn",
+        "physics.gen-ph",
+        "physics.geo-ph",
+        "physics.hist-ph",
+        "physics.ins-det",
+        "physics.med-ph",
+        "physics.optics",
+        "physics.plasm-ph",
+        "physics.pop-ph",
+        "physics.soc-ph",
         "physics.space-ph",
     ],
     "Quantum Physics": ["quant-ph"],
     "Computer Science": ["cs.AI", "cs.CL", "cs.CV", "cs.DS", "cs.LG", "cs.NE", "cs.RO"],
-    "Mathematics": ["math.AG", "math.AP", "math.DG", "math.DS", "math.NT", "math.PR", "math.ST"],
+    "Mathematics": [
+        "math.AG",
+        "math.AP",
+        "math.DG",
+        "math.DS",
+        "math.NT",
+        "math.PR",
+        "math.ST",
+    ],
     "Statistics": ["stat.AP", "stat.CO", "stat.ME", "stat.ML", "stat.TH"],
     "Electrical Engineering": ["eess.AS", "eess.IV", "eess.SP", "eess.SY"],
     "Quantitative Biology": [
-        "q-bio.BM", "q-bio.CB", "q-bio.GN", "q-bio.NC", "q-bio.PE", "q-bio.QM",
+        "q-bio.BM",
+        "q-bio.CB",
+        "q-bio.GN",
+        "q-bio.NC",
+        "q-bio.PE",
+        "q-bio.QM",
     ],
 }
 
@@ -255,318 +304,825 @@ ARXIV_GROUP_HINTS = {
 # Terms that hint at which arXiv categories to suggest
 CATEGORY_HINTS = {
     "astro-ph.EP": [
-        "exoplanet", "planet formation", "transit", "radial velocity", "habitable",
-        "atmosphere", "JWST", "Kepler", "TESS", "circumbinary", "hot jupiter",
-        "sub-neptune", "super-earth", "protoplanetary", "protoplanetary disk",
-        "planetary system", "planet formation", "transmission spectroscopy",
-        "radial-velocity", "earth-like", "biosignature", "accretion disk",
+        "exoplanet",
+        "planet formation",
+        "transit",
+        "radial velocity",
+        "habitable",
+        "atmosphere",
+        "JWST",
+        "Kepler",
+        "TESS",
+        "circumbinary",
+        "hot jupiter",
+        "sub-neptune",
+        "super-earth",
+        "protoplanetary",
+        "protoplanetary disk",
+        "planetary system",
+        "planet formation",
+        "transmission spectroscopy",
+        "radial-velocity",
+        "earth-like",
+        "biosignature",
+        "accretion disk",
     ],
     "astro-ph.SR": [
-        "stellar", "stellar rotation", "binary star", "spectroscopy", "magnetic",
-        "angular momentum", "obliquity", "spin-orbit", "vsini", "vbroad", "Gaia",
-        "gyrochronology", "asteroseismology", "variable star", "pulsation",
-        "white dwarf", "red giant", "main sequence", "chromosphere",
-        "flare", "metallicity", "abundance", "spectral type", "eclipsing binary",
-        "Rossiter-McLaughlin", "Doppler tomography", "Kraft break",
+        "stellar",
+        "stellar rotation",
+        "binary star",
+        "spectroscopy",
+        "magnetic",
+        "angular momentum",
+        "obliquity",
+        "spin-orbit",
+        "vsini",
+        "vbroad",
+        "Gaia",
+        "gyrochronology",
+        "asteroseismology",
+        "variable star",
+        "pulsation",
+        "white dwarf",
+        "red giant",
+        "main sequence",
+        "chromosphere",
+        "flare",
+        "metallicity",
+        "abundance",
+        "spectral type",
+        "eclipsing binary",
+        "Rossiter-McLaughlin",
+        "Doppler tomography",
+        "Kraft break",
     ],
     "astro-ph.GA": [
-        "galaxy", "galaxies", "galactic", "Milky Way", "dark matter",
-        "interstellar", "ISM", "star formation", "AGN", "quasar",
-        "merger", "cluster", "halo", "bulge", "spiral", "elliptical",
-        "HII region", "nebula", "chemical evolution", "stellar population",
+        "galaxy",
+        "galaxies",
+        "galactic",
+        "Milky Way",
+        "dark matter",
+        "interstellar",
+        "ISM",
+        "star formation",
+        "AGN",
+        "quasar",
+        "merger",
+        "cluster",
+        "halo",
+        "bulge",
+        "spiral",
+        "elliptical",
+        "HII region",
+        "nebula",
+        "chemical evolution",
+        "stellar population",
     ],
     "astro-ph.CO": [
-        "cosmolog", "CMB", "dark energy", "inflation", "baryon",
-        "large-scale structure", "BAO", "Hubble", "redshift", "gravitational lensing",
-        "cosmic microwave", "primordial", "Big Bang", "expansion",
+        "cosmolog",
+        "CMB",
+        "dark energy",
+        "inflation",
+        "baryon",
+        "large-scale structure",
+        "BAO",
+        "Hubble",
+        "redshift",
+        "gravitational lensing",
+        "cosmic microwave",
+        "primordial",
+        "Big Bang",
+        "expansion",
     ],
     "astro-ph.HE": [
-        "black hole", "neutron star", "pulsar", "magnetar", "GRB",
-        "gamma-ray", "X-ray", "accretion", "relativistic jet", "relativistic",
-        "gravitational wave", "LIGO", "compact object", "supernova",
+        "black hole",
+        "neutron star",
+        "pulsar",
+        "magnetar",
+        "GRB",
+        "gamma-ray",
+        "X-ray",
+        "accretion",
+        "relativistic jet",
+        "relativistic",
+        "gravitational wave",
+        "LIGO",
+        "compact object",
+        "supernova",
     ],
     "astro-ph.IM": [
-        "instrument", "detector", "telescope", "survey", "pipeline",
-        "calibration", "photometry", "astrometry", "spectrograph",
-        "adaptive optics", "CCD", "coronagraph", "interferometry",
+        "instrument",
+        "detector",
+        "telescope",
+        "survey",
+        "pipeline",
+        "calibration",
+        "photometry",
+        "astrometry",
+        "spectrograph",
+        "adaptive optics",
+        "CCD",
+        "coronagraph",
+        "interferometry",
     ],
     "hep-th": [
-        "string theory", "quantum field theory", "supersymmetry", "AdS/CFT",
-        "holograph", "conformal field", "gauge theory", "brane", "S-matrix",
-        "amplitude", "duality", "topological field theory",
+        "string theory",
+        "quantum field theory",
+        "supersymmetry",
+        "AdS/CFT",
+        "holograph",
+        "conformal field",
+        "gauge theory",
+        "brane",
+        "S-matrix",
+        "amplitude",
+        "duality",
+        "topological field theory",
     ],
     "hep-ph": [
-        "particle physics", "Standard Model", "Higgs", "collider", "LHC",
-        "neutrino", "dark matter candidate", "beyond Standard Model",
-        "parton", "QCD", "electroweak", "flavor physics", "CP violation",
+        "particle physics",
+        "Standard Model",
+        "Higgs",
+        "collider",
+        "LHC",
+        "neutrino",
+        "dark matter candidate",
+        "beyond Standard Model",
+        "parton",
+        "QCD",
+        "electroweak",
+        "flavor physics",
+        "CP violation",
     ],
     "hep-ex": [
-        "collider experiment", "ATLAS", "CMS", "LHCb", "Belle", "BaBar",
-        "particle detector", "particle beam", "cross section measurement",
-        "high energy experiment", "calorimeter",
+        "collider experiment",
+        "ATLAS",
+        "CMS",
+        "LHCb",
+        "Belle",
+        "BaBar",
+        "particle detector",
+        "particle beam",
+        "cross section measurement",
+        "high energy experiment",
+        "calorimeter",
     ],
     "hep-lat": [
-        "lattice QCD", "lattice gauge", "Monte Carlo lattice", "Wilson fermion",
-        "lattice field theory", "non-perturbative QCD",
+        "lattice QCD",
+        "lattice gauge",
+        "Monte Carlo lattice",
+        "Wilson fermion",
+        "lattice field theory",
+        "non-perturbative QCD",
     ],
     "gr-qc": [
-        "general relativity", "gravitational wave", "black hole", "spacetime",
-        "metric", "Einstein", "curvature", "singularity", "LIGO",
-        "post-Newtonian", "numerical relativity", "wormhole", "geodesic",
+        "general relativity",
+        "gravitational wave",
+        "black hole",
+        "spacetime",
+        "metric",
+        "Einstein",
+        "curvature",
+        "singularity",
+        "LIGO",
+        "post-Newtonian",
+        "numerical relativity",
+        "wormhole",
+        "geodesic",
     ],
     "math-ph": [
-        "mathematical physics", "rigorous", "spectral theory", "operator algebra",
-        "integrable system", "Hamiltonian", "symplectic", "functional analysis",
+        "mathematical physics",
+        "rigorous",
+        "spectral theory",
+        "operator algebra",
+        "integrable system",
+        "Hamiltonian",
+        "symplectic",
+        "functional analysis",
     ],
     "nucl-th": [
-        "nuclear theory", "nuclear structure", "shell model", "nuclear force",
-        "nucleon", "hadronic", "quark-gluon plasma", "nuclear matter", "fission",
+        "nuclear theory",
+        "nuclear structure",
+        "shell model",
+        "nuclear force",
+        "nucleon",
+        "hadronic",
+        "quark-gluon plasma",
+        "nuclear matter",
+        "fission",
     ],
     "nucl-ex": [
-        "nuclear experiment", "nuclear reaction", "radioactive beam", "heavy-ion",
-        "nuclear decay", "nuclear spectroscopy", "CERN", "RHIC", "nuclear cross section",
+        "nuclear experiment",
+        "nuclear reaction",
+        "radioactive beam",
+        "heavy-ion",
+        "nuclear decay",
+        "nuclear spectroscopy",
+        "CERN",
+        "RHIC",
+        "nuclear cross section",
     ],
     "nlin.CD": [
-        "chaos", "chaotic dynamics", "Lyapunov", "strange attractor", "bifurcation",
-        "nonlinear dynamics", "sensitive dependence",
+        "chaos",
+        "chaotic dynamics",
+        "Lyapunov",
+        "strange attractor",
+        "bifurcation",
+        "nonlinear dynamics",
+        "sensitive dependence",
     ],
     "nlin.PS": [
-        "soliton", "pattern formation", "nonlinear wave", "reaction-diffusion",
-        "Turing pattern", "amplitude equation", "modulational instability",
+        "soliton",
+        "pattern formation",
+        "nonlinear wave",
+        "reaction-diffusion",
+        "Turing pattern",
+        "amplitude equation",
+        "modulational instability",
     ],
     "nlin.SI": [
-        "integrable", "inverse scattering", "Lax pair", "Painlevé", "exact solution",
-        "conservation law", "Bäcklund",
+        "integrable",
+        "inverse scattering",
+        "Lax pair",
+        "Painlevé",
+        "exact solution",
+        "conservation law",
+        "Bäcklund",
     ],
     "nlin.AO": [
-        "self-organization", "adaptation", "complex system", "emergence",
-        "network dynamics", "synchronization",
+        "self-organization",
+        "adaptation",
+        "complex system",
+        "emergence",
+        "network dynamics",
+        "synchronization",
     ],
     "cond-mat.supr-con": [
-        "superconductor", "superconductivity", "BCS", "Cooper pair", "vortex",
-        "Josephson", "pairing", "Tc", "Meissner", "flux",
+        "superconductor",
+        "superconductivity",
+        "BCS",
+        "Cooper pair",
+        "vortex",
+        "Josephson",
+        "pairing",
+        "Tc",
+        "Meissner",
+        "flux",
     ],
     "cond-mat.str-el": [
-        "strongly correlated", "Mott insulator", "Hubbard", "Kondo", "heavy fermion",
-        "correlated electron", "charge order", "orbital order", "spin liquid", "Wigner",
+        "strongly correlated",
+        "Mott insulator",
+        "Hubbard",
+        "Kondo",
+        "heavy fermion",
+        "correlated electron",
+        "charge order",
+        "orbital order",
+        "spin liquid",
+        "Wigner",
     ],
     "cond-mat.mes-hall": [
-        "quantum dot", "quantum well", "nanostructure", "mesoscopic", "Hall effect",
-        "edge state", "nanowire", "carbon nanotube", "graphene", "2D material",
-        "topological insulator", "Dirac", "Weyl", "quantum transport", "spintronics",
+        "quantum dot",
+        "quantum well",
+        "nanostructure",
+        "mesoscopic",
+        "Hall effect",
+        "edge state",
+        "nanowire",
+        "carbon nanotube",
+        "graphene",
+        "2D material",
+        "topological insulator",
+        "Dirac",
+        "Weyl",
+        "quantum transport",
+        "spintronics",
     ],
     "cond-mat.mtrl-sci": [
-        "material", "thin film", "alloy", "doping", "defect", "grain boundary",
-        "first-principles", "DFT", "density functional", "ab initio", "crystal structure",
-        "X-ray diffraction", "XRD", "synthesis", "epitaxy", "heterostructure",
+        "material",
+        "thin film",
+        "alloy",
+        "doping",
+        "defect",
+        "grain boundary",
+        "first-principles",
+        "DFT",
+        "density functional",
+        "ab initio",
+        "crystal structure",
+        "X-ray diffraction",
+        "XRD",
+        "synthesis",
+        "epitaxy",
+        "heterostructure",
     ],
     "cond-mat.stat-mech": [
-        "statistical mechanics", "phase transition", "critical exponent", "renormalization",
-        "Ising model", "Monte Carlo", "entropy", "free energy", "thermodynamic",
-        "universality", "scaling", "order parameter",
+        "statistical mechanics",
+        "phase transition",
+        "critical exponent",
+        "renormalization",
+        "Ising model",
+        "Monte Carlo",
+        "entropy",
+        "free energy",
+        "thermodynamic",
+        "universality",
+        "scaling",
+        "order parameter",
     ],
     "cond-mat.soft": [
-        "soft matter", "polymer", "colloid", "liquid crystal", "gel", "foam",
-        "active matter", "self-assembly", "rheology", "viscoelastic", "amphiphile",
+        "soft matter",
+        "polymer",
+        "colloid",
+        "liquid crystal",
+        "gel",
+        "foam",
+        "active matter",
+        "self-assembly",
+        "rheology",
+        "viscoelastic",
+        "amphiphile",
     ],
     "cond-mat.quant-gas": [
-        "ultracold", "Bose-Einstein condensate", "BEC", "optical lattice", "cold atom",
-        "Fermi gas", "Feshbach resonance", "superfluidity", "quantum gas",
+        "ultracold",
+        "Bose-Einstein condensate",
+        "BEC",
+        "optical lattice",
+        "cold atom",
+        "Fermi gas",
+        "Feshbach resonance",
+        "superfluidity",
+        "quantum gas",
     ],
     "cond-mat.dis-nn": [
-        "disorder", "Anderson localization", "spin glass", "random", "amorphous",
-        "percolation", "neural network", "glassy", "many-body localization", "MBL",
+        "disorder",
+        "Anderson localization",
+        "spin glass",
+        "random",
+        "amorphous",
+        "percolation",
+        "neural network",
+        "glassy",
+        "many-body localization",
+        "MBL",
     ],
     "quant-ph": [
-        "quantum computing", "qubit", "entanglement", "quantum information",
-        "quantum optics", "decoherence", "quantum error", "quantum algorithm",
+        "quantum computing",
+        "qubit",
+        "entanglement",
+        "quantum information",
+        "quantum optics",
+        "decoherence",
+        "quantum error",
+        "quantum algorithm",
     ],
     "physics.atom-ph": [
-        "atomic physics", "cold atoms", "laser cooling", "Bose-Einstein", "ion trap",
-        "optical clock", "precision measurement", "atomic spectrum", "photoionization",
+        "atomic physics",
+        "cold atoms",
+        "laser cooling",
+        "Bose-Einstein",
+        "ion trap",
+        "optical clock",
+        "precision measurement",
+        "atomic spectrum",
+        "photoionization",
     ],
     "physics.atm-clus": [
-        "atomic cluster", "nanoparticle", "fullerene", "cluster physics",
-        "molecular cluster", "van der Waals cluster",
+        "atomic cluster",
+        "nanoparticle",
+        "fullerene",
+        "cluster physics",
+        "molecular cluster",
+        "van der Waals cluster",
     ],
     "physics.chem-ph": [
-        "chemical physics", "molecular physics", "reaction dynamics", "potential energy surface",
-        "spectroscopy", "photochemistry", "adiabatic", "Born-Oppenheimer",
+        "chemical physics",
+        "molecular physics",
+        "reaction dynamics",
+        "potential energy surface",
+        "spectroscopy",
+        "photochemistry",
+        "adiabatic",
+        "Born-Oppenheimer",
     ],
     "physics.comp-ph": [
-        "computational physics", "simulation", "numerical method", "finite element",
-        "molecular dynamics simulation", "Monte Carlo simulation", "FDTD", "algorithm",
+        "computational physics",
+        "simulation",
+        "numerical method",
+        "finite element",
+        "molecular dynamics simulation",
+        "Monte Carlo simulation",
+        "FDTD",
+        "algorithm",
     ],
     "physics.plasm-ph": [
-        "plasma", "fusion", "tokamak", "plasma wave", "magnetohydrodynamic", "MHD",
-        "inertial confinement", "plasma instability", "ITER", "laser plasma",
+        "plasma",
+        "fusion",
+        "tokamak",
+        "plasma wave",
+        "magnetohydrodynamic",
+        "MHD",
+        "inertial confinement",
+        "plasma instability",
+        "ITER",
+        "laser plasma",
     ],
     "physics.space-ph": [
-        "space physics", "solar wind", "magnetosphere", "ionosphere", "cosmic ray",
-        "heliosphere", "aurora", "geomagnetic storm", "Van Allen",
+        "space physics",
+        "solar wind",
+        "magnetosphere",
+        "ionosphere",
+        "cosmic ray",
+        "heliosphere",
+        "aurora",
+        "geomagnetic storm",
+        "Van Allen",
     ],
     "physics.ao-ph": [
-        "atmospheric", "climate", "ocean", "meteorology", "geophysical fluid",
-        "El Niño", "general circulation", "aerosol", "cloud physics",
+        "atmospheric",
+        "climate",
+        "ocean",
+        "meteorology",
+        "geophysical fluid",
+        "El Niño",
+        "general circulation",
+        "aerosol",
+        "cloud physics",
     ],
     "physics.geo-ph": [
-        "geophysics", "seismic", "earthquake", "mantle", "plate tectonics",
-        "seismology", "geodesy", "geodynamics", "geomagnetism",
+        "geophysics",
+        "seismic",
+        "earthquake",
+        "mantle",
+        "plate tectonics",
+        "seismology",
+        "geodesy",
+        "geodynamics",
+        "geomagnetism",
     ],
     "physics.ins-det": [
-        "detector", "instrumentation", "sensor", "readout", "signal processing",
-        "particle detector", "scintillator", "photodetector", "FPGA",
+        "detector",
+        "instrumentation",
+        "sensor",
+        "readout",
+        "signal processing",
+        "particle detector",
+        "scintillator",
+        "photodetector",
+        "FPGA",
     ],
     "physics.med-ph": [
-        "medical physics", "radiation therapy", "MRI", "CT scan", "dosimetry",
-        "radiobiology", "proton therapy", "nuclear medicine", "imaging",
+        "medical physics",
+        "radiation therapy",
+        "MRI",
+        "CT scan",
+        "dosimetry",
+        "radiobiology",
+        "proton therapy",
+        "nuclear medicine",
+        "imaging",
     ],
     "physics.optics": [
-        "optical", "laser", "photon", "waveguide", "fiber", "lens",
-        "diffraction", "nonlinear optics", "ultrafast", "plasmon",
+        "optical",
+        "laser",
+        "photon",
+        "waveguide",
+        "fiber",
+        "lens",
+        "diffraction",
+        "nonlinear optics",
+        "ultrafast",
+        "plasmon",
     ],
     "physics.bio-ph": [
-        "biophysics", "protein", "membrane", "DNA", "RNA", "cell",
-        "molecular dynamics", "biological", "enzyme", "single-molecule",
+        "biophysics",
+        "protein",
+        "membrane",
+        "DNA",
+        "RNA",
+        "cell",
+        "molecular dynamics",
+        "biological",
+        "enzyme",
+        "single-molecule",
     ],
     "physics.flu-dyn": [
-        "fluid", "turbulence", "Navier-Stokes", "flow", "viscous",
-        "Reynolds", "boundary layer", "vortex", "aerodynamics",
+        "fluid",
+        "turbulence",
+        "Navier-Stokes",
+        "flow",
+        "viscous",
+        "Reynolds",
+        "boundary layer",
+        "vortex",
+        "aerodynamics",
     ],
     "physics.acc-ph": [
-        "accelerator", "synchrotron", "free electron laser", "beam physics",
-        "particle accelerator", "storage ring", "undulator", "linac",
+        "accelerator",
+        "synchrotron",
+        "free electron laser",
+        "beam physics",
+        "particle accelerator",
+        "storage ring",
+        "undulator",
+        "linac",
     ],
     "physics.data-an": [
-        "data analysis", "statistical method", "uncertainty quantification",
-        "systematic error", "likelihood", "goodness of fit",
+        "data analysis",
+        "statistical method",
+        "uncertainty quantification",
+        "systematic error",
+        "likelihood",
+        "goodness of fit",
     ],
     "cs.AI": [
-        "artificial intelligence", "reasoning", "planning", "knowledge",
-        "agent", "reinforcement learning", "multi-agent",
+        "artificial intelligence",
+        "reasoning",
+        "planning",
+        "knowledge",
+        "agent",
+        "reinforcement learning",
+        "multi-agent",
     ],
     "cs.LG": [
-        "machine learning", "deep learning", "neural network", "transformer",
-        "GPT", "training", "gradient", "optimization", "generalization",
+        "machine learning",
+        "deep learning",
+        "neural network",
+        "transformer",
+        "GPT",
+        "training",
+        "gradient",
+        "optimization",
+        "generalization",
     ],
     "cs.CV": [
-        "computer vision", "image", "object detection", "segmentation",
-        "convolutional", "CNN", "visual", "recognition",
+        "computer vision",
+        "image",
+        "object detection",
+        "segmentation",
+        "convolutional",
+        "CNN",
+        "visual",
+        "recognition",
     ],
     "cs.CL": [
-        "natural language", "NLP", "language model", "text", "translation",
-        "sentiment", "parsing", "BERT", "tokeniz",
+        "natural language",
+        "NLP",
+        "language model",
+        "text",
+        "translation",
+        "sentiment",
+        "parsing",
+        "BERT",
+        "tokeniz",
     ],
     "cs.DS": [
-        "algorithm", "data structure", "complexity", "graph algorithm",
-        "sorting", "combinatorial", "approximation algorithm",
+        "algorithm",
+        "data structure",
+        "complexity",
+        "graph algorithm",
+        "sorting",
+        "combinatorial",
+        "approximation algorithm",
     ],
     "cs.RO": [
-        "robot", "robotics", "motion planning", "control", "autonomous",
-        "SLAM", "manipulation", "drone",
+        "robot",
+        "robotics",
+        "motion planning",
+        "control",
+        "autonomous",
+        "SLAM",
+        "manipulation",
+        "drone",
     ],
     "cs.NE": [
-        "evolutionary", "genetic algorithm", "swarm", "neuroevolution",
-        "neural architecture search", "bio-inspired",
+        "evolutionary",
+        "genetic algorithm",
+        "swarm",
+        "neuroevolution",
+        "neural architecture search",
+        "bio-inspired",
     ],
     "math.AP": [
-        "partial differential equation", "PDE", "elliptic", "parabolic",
-        "hyperbolic", "weak solution", "regularity", "Sobolev",
+        "partial differential equation",
+        "PDE",
+        "elliptic",
+        "parabolic",
+        "hyperbolic",
+        "weak solution",
+        "regularity",
+        "Sobolev",
     ],
     "math.PR": [
-        "probability", "stochastic process", "Brownian motion", "Markov chain",
-        "random walk", "martingale", "diffusion process",
+        "probability",
+        "stochastic process",
+        "Brownian motion",
+        "Markov chain",
+        "random walk",
+        "martingale",
+        "diffusion process",
     ],
     "math.ST": [
-        "statistics", "hypothesis testing", "estimator", "asymptotic",
-        "consistency", "maximum likelihood", "nonparametric",
+        "statistics",
+        "hypothesis testing",
+        "estimator",
+        "asymptotic",
+        "consistency",
+        "maximum likelihood",
+        "nonparametric",
     ],
     "math.DS": [
-        "dynamical system", "ergodic", "attractor", "invariant measure",
-        "topological dynamics", "symbolic dynamics",
+        "dynamical system",
+        "ergodic",
+        "attractor",
+        "invariant measure",
+        "topological dynamics",
+        "symbolic dynamics",
     ],
     "math.NT": [
-        "number theory", "prime", "Riemann", "arithmetic", "Diophantine",
-        "algebraic number", "modular form", "L-function",
+        "number theory",
+        "prime",
+        "Riemann",
+        "arithmetic",
+        "Diophantine",
+        "algebraic number",
+        "modular form",
+        "L-function",
     ],
     "math.AG": [
-        "algebraic geometry", "variety", "scheme", "sheaf", "cohomology",
-        "moduli", "Hodge theory", "Calabi-Yau",
+        "algebraic geometry",
+        "variety",
+        "scheme",
+        "sheaf",
+        "cohomology",
+        "moduli",
+        "Hodge theory",
+        "Calabi-Yau",
     ],
     "math.DG": [
-        "differential geometry", "manifold", "Riemannian", "curvature tensor",
-        "connection", "fiber bundle", "symplectic manifold",
+        "differential geometry",
+        "manifold",
+        "Riemannian",
+        "curvature tensor",
+        "connection",
+        "fiber bundle",
+        "symplectic manifold",
     ],
     "math-ph": [
-        "mathematical physics", "rigorous", "spectral theory", "operator algebra",
-        "integrable system", "Hamiltonian", "symplectic",
+        "mathematical physics",
+        "rigorous",
+        "spectral theory",
+        "operator algebra",
+        "integrable system",
+        "Hamiltonian",
+        "symplectic",
     ],
     "stat.ML": [
-        "statistical learning", "Bayesian", "inference", "regression",
-        "classification", "kernel", "non-parametric", "MCMC",
+        "statistical learning",
+        "Bayesian",
+        "inference",
+        "regression",
+        "classification",
+        "kernel",
+        "non-parametric",
+        "MCMC",
     ],
     "stat.ME": [
-        "statistical methodology", "survey sampling", "experimental design",
-        "causal inference", "missing data", "mixed model",
+        "statistical methodology",
+        "survey sampling",
+        "experimental design",
+        "causal inference",
+        "missing data",
+        "mixed model",
     ],
     "stat.AP": [
-        "applied statistics", "biostatistics", "clinical trial", "survival analysis",
-        "epidemiology", "econometrics",
+        "applied statistics",
+        "biostatistics",
+        "clinical trial",
+        "survival analysis",
+        "epidemiology",
+        "econometrics",
     ],
     "eess.SP": [
-        "signal processing", "Fourier", "filter", "time series", "spectral estimation",
-        "compressed sensing", "wavelet",
+        "signal processing",
+        "Fourier",
+        "filter",
+        "time series",
+        "spectral estimation",
+        "compressed sensing",
+        "wavelet",
     ],
     "eess.SY": [
-        "control system", "feedback", "stability", "optimal control",
-        "robust control", "system identification", "Lyapunov",
+        "control system",
+        "feedback",
+        "stability",
+        "optimal control",
+        "robust control",
+        "system identification",
+        "Lyapunov",
     ],
     "eess.IV": [
-        "image processing", "video", "compression", "super-resolution",
-        "image reconstruction", "denoising",
+        "image processing",
+        "video",
+        "compression",
+        "super-resolution",
+        "image reconstruction",
+        "denoising",
     ],
     "eess.AS": [
-        "audio", "speech recognition", "speaker", "acoustic", "sound",
-        "music information retrieval", "spoken language",
+        "audio",
+        "speech recognition",
+        "speaker",
+        "acoustic",
+        "sound",
+        "music information retrieval",
+        "spoken language",
     ],
     "q-bio.BM": [
-        "biomolecule", "protein structure", "protein folding", "molecular biology",
-        "enzyme kinetics", "RNA structure", "AlphaFold",
+        "biomolecule",
+        "protein structure",
+        "protein folding",
+        "molecular biology",
+        "enzyme kinetics",
+        "RNA structure",
+        "AlphaFold",
     ],
     "q-bio.NC": [
-        "neuroscience", "neural circuit", "brain", "synapse", "spike",
-        "neural coding", "cortex", "connectome",
+        "neuroscience",
+        "neural circuit",
+        "brain",
+        "synapse",
+        "spike",
+        "neural coding",
+        "cortex",
+        "connectome",
     ],
     "q-bio.PE": [
-        "evolution", "population genetics", "phylogeny", "fitness",
-        "selection", "mutation rate", "ecological dynamics",
+        "evolution",
+        "population genetics",
+        "phylogeny",
+        "fitness",
+        "selection",
+        "mutation rate",
+        "ecological dynamics",
     ],
     "q-bio.GN": [
-        "genomics", "genome", "gene expression", "RNA-seq", "CRISPR",
-        "sequencing", "transcriptome", "epigenome",
+        "genomics",
+        "genome",
+        "gene expression",
+        "RNA-seq",
+        "CRISPR",
+        "sequencing",
+        "transcriptome",
+        "epigenome",
     ],
     "q-bio.QM": [
-        "quantitative biology", "mathematical biology", "systems biology",
-        "computational biology", "bioinformatics",
+        "quantitative biology",
+        "mathematical biology",
+        "systems biology",
+        "computational biology",
+        "bioinformatics",
     ],
     "q-bio.CB": [
-        "cell motility", "cell signaling", "cytoskeleton", "cell division",
-        "chemotaxis", "collective cell migration", "cellular mechanics",
+        "cell motility",
+        "cell signaling",
+        "cytoskeleton",
+        "cell division",
+        "chemotaxis",
+        "collective cell migration",
+        "cellular mechanics",
     ],
     "stat.CO": [
-        "computational statistics", "MCMC algorithm", "variational inference",
-        "approximate Bayesian", "ABC", "expectation maximization",
+        "computational statistics",
+        "MCMC algorithm",
+        "variational inference",
+        "approximate Bayesian",
+        "ABC",
+        "expectation maximization",
     ],
     "stat.TH": [
-        "statistical theory", "minimax", "risk bound", "concentration inequality",
-        "semiparametric", "empirical process", "decision theory",
+        "statistical theory",
+        "minimax",
+        "risk bound",
+        "concentration inequality",
+        "semiparametric",
+        "empirical process",
+        "decision theory",
     ],
     "nlin.CG": [
-        "cellular automaton", "lattice gas", "rule", "automata", "discrete simulation",
+        "cellular automaton",
+        "lattice gas",
+        "rule",
+        "automata",
+        "discrete simulation",
     ],
     "physics.soc-ph": [
-        "social physics", "opinion dynamics", "social network", "agent-based social",
-        "econophysics", "complex network",
+        "social physics",
+        "opinion dynamics",
+        "social network",
+        "agent-based social",
+        "econophysics",
+        "complex network",
     ],
 }
 
@@ -582,10 +1138,10 @@ def suggest_categories(text: str) -> list[str]:
             f"  {code}: {name}" for code, name in ARXIV_CATEGORIES.items()
         )
         prompt = (
-            f"A researcher describes their work as:\n\"{text}\"\n\n"
+            f'A researcher describes their work as:\n"{text}"\n\n'
             f"Here is the full list of arXiv categories:\n{cat_list}\n\n"
             "Return ONLY a JSON array of the 4–6 most relevant category codes "
-            "(e.g. [\"cond-mat.supr-con\", \"cond-mat.mes-hall\"]). "
+            '(e.g. ["cond-mat.supr-con", "cond-mat.mes-hall"]). '
             "Pick the best-matching sub-categories — never return a bare top-level code "
             "like 'cond-mat' or 'astro-ph' unless it appears exactly in the list above. "
             "No explanation, no other text."
@@ -703,7 +1259,9 @@ def draft_research_description(keywords: dict[str, int]) -> str:
         "Be specific and technical. Return only the description, no other text."
     )
     result = _call_ai(prompt, max_tokens=200)
-    return result if result else f"My research focuses on {', '.join(top_keywords[:5])}."
+    return (
+        result if result else f"My research focuses on {', '.join(top_keywords[:5])}."
+    )
 
 
 def _summarise_research(titles: list[str]) -> str:
@@ -751,8 +1309,10 @@ def _get_anthropic_key() -> str | None:
 
 def _ai_available() -> bool:
     """True if any AI key is configured."""
-    return bool((_get_gemini_key() and _GEMINI_AVAILABLE) or
-                (_get_anthropic_key() and _ANTHROPIC_AVAILABLE))
+    return bool(
+        (_get_gemini_key() and _GEMINI_AVAILABLE)
+        or (_get_anthropic_key() and _ANTHROPIC_AVAILABLE)
+    )
 
 
 def _keyword_regex_fallback(text: str) -> dict[str, int]:
@@ -760,14 +1320,70 @@ def _keyword_regex_fallback(text: str) -> dict[str, int]:
     words = text.split()
     candidates: dict[str, int] = {}
     stopwords = {
-        "i", "my", "me", "we", "our", "the", "a", "an", "and", "or", "but",
-        "in", "on", "at", "to", "for", "of", "with", "by", "from", "as",
-        "is", "was", "are", "were", "been", "be", "have", "has", "had",
-        "do", "does", "did", "will", "would", "could", "should", "that",
-        "which", "who", "this", "these", "it", "its", "their", "also",
-        "using", "such", "both", "between", "about", "into", "through",
-        "particularly", "specifically", "especially", "including", "focus",
-        "work", "study", "research", "currently", "mainly", "primarily",
+        "i",
+        "my",
+        "me",
+        "we",
+        "our",
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "as",
+        "is",
+        "was",
+        "are",
+        "were",
+        "been",
+        "be",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "that",
+        "which",
+        "who",
+        "this",
+        "these",
+        "it",
+        "its",
+        "their",
+        "also",
+        "using",
+        "such",
+        "both",
+        "between",
+        "about",
+        "into",
+        "through",
+        "particularly",
+        "specifically",
+        "especially",
+        "including",
+        "focus",
+        "work",
+        "study",
+        "research",
+        "currently",
+        "mainly",
+        "primarily",
     }
     clean_words = [re.sub(r"[.,;:!?()\"']", "", w) for w in words if w]
 
@@ -787,18 +1403,27 @@ def _keyword_regex_fallback(text: str) -> dict[str, int]:
                 candidates[bigram] = 7
 
     for i in range(len(clean_words) - 2):
-        w1, w2, w3 = clean_words[i].lower(), clean_words[i + 1].lower(), clean_words[i + 2].lower()
+        w1, w2, w3 = (
+            clean_words[i].lower(),
+            clean_words[i + 1].lower(),
+            clean_words[i + 2].lower(),
+        )
         if all(w not in stopwords and len(w) > 2 for w in (w1, w2, w3)):
             trigram = f"{w1} {w2} {w3}"
             if len(trigram) > 10:
                 candidates[trigram] = 9
 
     generic = {"et al", "ground based", "non linear"}
-    return {k: v for k, v in sorted(candidates.items(), key=lambda x: -x[1])[:25]
-            if k.lower() not in generic}
+    return {
+        k: v
+        for k, v in sorted(candidates.items(), key=lambda x: -x[1])[:25]
+        if k.lower() not in generic
+    }
 
 
-def suggest_keywords_from_context(text: str, orcid_keywords: dict | None = None) -> dict[str, int]:
+def suggest_keywords_from_context(
+    text: str, orcid_keywords: dict | None = None
+) -> dict[str, int]:
     """Score research keywords by relevance using Claude if available, regex otherwise.
 
     When orcid_keywords is provided, Claude re-scores those publication-derived keywords
@@ -818,7 +1443,7 @@ def suggest_keywords_from_context(text: str, orcid_keywords: dict | None = None)
     candidate_list = "\n".join(f"- {kw}" for kw in all_candidates)
 
     prompt = (
-        f"A researcher describes their work as:\n\"{text}\"\n\n"
+        f'A researcher describes their work as:\n"{text}"\n\n'
         f"These are candidate keywords (some from publication titles, some from the description):\n"
         f"{candidate_list}\n\n"
         "Score each keyword's relevance to this researcher's specific field on a scale of 1–10. "
@@ -835,10 +1460,12 @@ def suggest_keywords_from_context(text: str, orcid_keywords: dict | None = None)
         raw = re.sub(r"^```[a-z]*\n?", "", raw)
         raw = re.sub(r"\n?```$", "", raw)
         scored: dict[str, int] = json.loads(raw)
-        return dict(sorted(
-            {k: max(1, min(10, int(v))) for k, v in scored.items()}.items(),
-            key=lambda x: -x[1],
-        )[:25])
+        return dict(
+            sorted(
+                {k: max(1, min(10, int(v))) for k, v in scored.items()}.items(),
+                key=lambda x: -x[1],
+            )[:25]
+        )
     except Exception:
         return _keyword_regex_fallback(text)
 
@@ -846,6 +1473,7 @@ def suggest_keywords_from_context(text: str, orcid_keywords: dict | None = None)
 # ─────────────────────────────────────────────────────────────
 #  Profile import helpers
 # ─────────────────────────────────────────────────────────────
+
 
 def _apply_orcid_keywords(keywords: dict, orcid_url: str = "") -> None:
     """Merge ORCID keywords into session state and auto-draft description."""
@@ -857,8 +1485,12 @@ def _apply_orcid_keywords(keywords: dict, orcid_url: str = "") -> None:
             if _ai_available():
                 _drafted = draft_research_description(merged)
             else:
-                _top_kws = [k for k, _ in sorted(merged.items(), key=lambda x: -x[1])[:5]]
-                _drafted = f"My research focuses on {', '.join(_top_kws)}." if _top_kws else ""
+                _top_kws = [
+                    k for k, _ in sorted(merged.items(), key=lambda x: -x[1])[:5]
+                ]
+                _drafted = (
+                    f"My research focuses on {', '.join(_top_kws)}." if _top_kws else ""
+                )
             if _drafted:
                 st.session_state.research_description = _drafted
                 st.session_state._research_description_val = _drafted
@@ -879,8 +1511,12 @@ def _apply_pure_keywords(keywords: dict | None, coauthors: list | None) -> None:
             parts = name.split()
             if len(parts) >= 2:
                 match_pattern = f"{parts[-1]}, {parts[0][0]}"
-                if not any(c["name"] == name for c in st.session_state.colleagues_people):
-                    st.session_state.colleagues_people.append({"name": name, "match": [match_pattern]})
+                if not any(
+                    c["name"] == name for c in st.session_state.colleagues_people
+                ):
+                    st.session_state.colleagues_people.append(
+                        {"name": name, "match": [match_pattern]}
+                    )
     st.session_state.pure_scanned = True
 
 
@@ -898,7 +1534,9 @@ def _import_profile(result: dict) -> None:
     # Persist titles, works meta, and coauthor map for paper selector and suggested colleagues
     st.session_state["_orcid_titles"] = _titles or []
     st.session_state["_orcid_works_meta"] = _works_meta or []
-    st.session_state["_orcid_coauthor_map"] = dict(_coauthor_map) if _coauthor_map else {}
+    st.session_state["_orcid_coauthor_map"] = (
+        dict(_coauthor_map) if _coauthor_map else {}
+    )
     if not error and keywords:
         _apply_orcid_keywords(keywords, orcid_url=result["url"])
     else:
@@ -911,6 +1549,7 @@ def _import_profile(result: dict) -> None:
 # ─────────────────────────────────────────────────────────────
 #  Server-key mode + rate limiting
 # ─────────────────────────────────────────────────────────────
+
 
 def _has_server_key() -> bool:
     """True if a Gemini key is baked into Streamlit secrets (server-side)."""
@@ -929,6 +1568,7 @@ def _server_smtp() -> tuple[str, str]:
         )
     except Exception:
         return "", ""
+
 
 # Module-level dict: email (lowercased) → unix timestamp of last use.
 # Persists for the lifetime of the Streamlit process (resets on redeploy).
@@ -998,12 +1638,15 @@ Set up your personal arXiv digest in 5 minutes. This wizard generates a `config.
 that you drop into your GitHub fork — then you'll get curated papers delivered to your inbox.
 """)
 
-st.markdown(f"""
+st.markdown(
+    f"""
 <div style="font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
      text-transform: uppercase; color: {WARM_GREY}; margin-top: -8px; margin-bottom: 24px;">
      Built by <a href="https://silkedainese.github.io" style="color: {PINE};">Silke S. Dainese</a>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ── AI setup — server key (no user key needed) or bring-your-own ──
 if _has_server_key():
@@ -1067,7 +1710,9 @@ else:
             st.error(f"Key didn't work: {_key_err}")
             st.stop()
     else:
-        st.warning("Enter an API key above to continue. AI is required for profile search and paper scoring.")
+        st.warning(
+            "Enter an API key above to continue. AI is required for profile search and paper scoring."
+        )
         st.stop()
 
 ai_assist = True  # AI is always on when we reach this point
@@ -1082,7 +1727,10 @@ st.divider()
 if "pure_confirmed_url" not in st.session_state:
     st.session_state.pure_confirmed_url = ""
 if "orcid_preview" not in st.session_state:
-    st.session_state.orcid_preview = None  # dict with name/institution/orcid_url/keywords when pending
+    st.session_state.orcid_preview = (
+        None  # dict with name/institution/orcid_url/keywords when pending
+    )
+
 
 def _commit_preview() -> None:
     """Write the staged orcid_preview into session state and mark as scanned."""
@@ -1113,8 +1761,25 @@ def _commit_preview() -> None:
             # No AI and no keywords: build a minimal fallback from paper titles.
             _top_titles = p["titles"][:5]
             _words = []
-            _stopwords = {"a", "an", "the", "of", "in", "on", "at", "to", "for",
-                          "and", "or", "with", "from", "by", "is", "are", "using"}
+            _stopwords = {
+                "a",
+                "an",
+                "the",
+                "of",
+                "in",
+                "on",
+                "at",
+                "to",
+                "for",
+                "and",
+                "or",
+                "with",
+                "from",
+                "by",
+                "is",
+                "are",
+                "using",
+            }
             for _t in _top_titles:
                 for _w in _t.split():
                     _clean = re.sub(r"[^a-zA-Z\-]", "", _w)
@@ -1141,7 +1806,9 @@ def _commit_preview() -> None:
         else:
             match_pattern = name
         if not any(c["name"] == name for c in st.session_state.colleagues_people):
-            st.session_state.colleagues_people.append({"name": name, "match": [match_pattern]})
+            st.session_state.colleagues_people.append(
+                {"name": name, "match": [match_pattern]}
+            )
 
     # Auto-populate self-match from ORCID name
     full_name = p.get("name", "").strip()
@@ -1165,7 +1832,9 @@ def _commit_preview() -> None:
 
 
 with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step == 1)):
-    st.markdown("Enter your ORCID ID — we'll pull your profile and publications automatically.")
+    st.markdown(
+        "Enter your ORCID ID — we'll pull your profile and publications automatically."
+    )
 
     # ── Already confirmed — show summary and allow reset ──
     if st.session_state.pure_scanned:
@@ -1187,7 +1856,9 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
                 label_visibility="collapsed",
             )
         with col_btn:
-            fetch_clicked = st.button("🔍 Fetch", type="primary", use_container_width=True)
+            fetch_clicked = st.button(
+                "🔍 Fetch", type="primary", use_container_width=True
+            )
 
         if orcid_input and fetch_clicked:
             inp = orcid_input.strip().rstrip("/")
@@ -1199,14 +1870,18 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
                 orcid_id = inp
                 orcid_url = f"https://orcid.org/{inp}"
             else:
-                st.error("That doesn't look like an ORCID. Expected format: 0000-0001-2345-6789")
+                st.error(
+                    "That doesn't look like an ORCID. Expected format: 0000-0001-2345-6789"
+                )
                 orcid_id = ""
                 orcid_url = ""
 
             if orcid_id:
                 with st.spinner("Fetching profile and publications from ORCID..."):
                     full_name, institution, person_error = fetch_orcid_person(orcid_id)
-                    keywords, titles, works_meta, coauthor_map, works_error = fetch_orcid_works(orcid_id)
+                    keywords, titles, works_meta, coauthor_map, works_error = (
+                        fetch_orcid_works(orcid_id)
+                    )
 
                 if person_error:
                     st.error(f"Could not fetch profile: {person_error}")
@@ -1214,7 +1889,9 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
                     # Find AU colleagues in the background (parallel ORCID checks)
                     au_colleagues: list[str] = []
                     if coauthor_map:
-                        with st.spinner("Checking co-authors for Aarhus University affiliation..."):
+                        with st.spinner(
+                            "Checking co-authors for Aarhus University affiliation..."
+                        ):
                             au_colleagues = find_au_colleagues(
                                 coauthor_map,
                                 institution=institution or "Aarhus University",
@@ -1235,7 +1912,9 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
                         # Per-paper metadata (title + year) for smart pre-selection
                         "works_meta": works_meta or [],
                         "au_colleagues": au_colleagues,
-                        "all_coauthors": sorted(coauthor_map.values()) if coauthor_map else [],
+                        "all_coauthors": sorted(coauthor_map.values())
+                        if coauthor_map
+                        else [],
                         # Raw coauthor map retained for frequency counting in suggested-colleagues
                         "coauthor_map": dict(coauthor_map) if coauthor_map else {},
                         "research_summary": research_summary,
@@ -1243,7 +1922,9 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
                         "selected_colleagues": list(au_colleagues),
                     }
                     if works_error:
-                        st.warning("Profile found but no publications on ORCID — keywords and colleagues will be empty.")
+                        st.warning(
+                            "Profile found but no publications on ORCID — keywords and colleagues will be empty."
+                        )
 
         # ── Review card: show what was found, let user correct ──
         if st.session_state.orcid_preview:
@@ -1254,32 +1935,47 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
             if p["keywords"]:
                 st.markdown("**Keywords from your publications:**")
                 kw_display = "  ·  ".join(
-                    k for k, _ in sorted(p["keywords"].items(), key=lambda x: -x[1])[:12]
+                    k
+                    for k, _ in sorted(p["keywords"].items(), key=lambda x: -x[1])[:12]
                 )
                 st.caption(kw_display + "  _(you can adjust these below)_")
             else:
                 st.caption("No keywords found — you can add them manually below.")
 
             # ── Colleagues ──
-            st.markdown("**Colleagues to track** — papers by these people always appear in your digest:")
+            st.markdown(
+                "**Colleagues to track** — papers by these people always appear in your digest:"
+            )
             # Preserve manually added colleagues across re-renders
             p.setdefault("selected_colleagues", [])
 
             if p.get("au_colleagues"):
-                st.caption(f"Found {len(p['au_colleagues'])} co-authors at {p['institution']} — uncheck any to exclude, or add more below.")
-                manual = [c for c in p["selected_colleagues"] if c not in p["au_colleagues"]]
+                st.caption(
+                    f"Found {len(p['au_colleagues'])} co-authors at {p['institution']} — uncheck any to exclude, or add more below."
+                )
+                manual = [
+                    c for c in p["selected_colleagues"] if c not in p["au_colleagues"]
+                ]
                 selected = list(manual)
                 for colleague in p["au_colleagues"]:
-                    checked = st.checkbox(colleague, value=True, key=f"colleague_{colleague}")
+                    checked = st.checkbox(
+                        colleague, value=True, key=f"colleague_{colleague}"
+                    )
                     if checked:
                         selected.append(colleague)
                 p["selected_colleagues"] = selected
             else:
                 if p.get("titles"):
-                    st.caption(f"No co-authors with confirmed {p['institution']} affiliation found automatically.")
+                    st.caption(
+                        f"No co-authors with confirmed {p['institution']} affiliation found automatically."
+                    )
 
             # Show manually added colleagues (not from auto-detection)
-            manual_added = [c for c in p["selected_colleagues"] if c not in p.get("au_colleagues", [])]
+            manual_added = [
+                c
+                for c in p["selected_colleagues"]
+                if c not in p.get("au_colleagues", [])
+            ]
             if manual_added:
                 st.caption("Manually added colleagues:")
                 to_remove = []
@@ -1320,34 +2016,52 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
 
                 if lookup_id:
                     with st.spinner("Looking up colleague..."):
-                        found_name, found_inst, found_err = fetch_orcid_person(lookup_id)
+                        found_name, found_inst, found_err = fetch_orcid_person(
+                            lookup_id
+                        )
                     if found_err:
                         st.error(f"Could not fetch: {found_err}")
                     elif found_name and found_name not in p["selected_colleagues"]:
                         p["selected_colleagues"].append(found_name)
-                        st.success(f"Added {found_name} ({found_inst or 'no institution on ORCID'})")
+                        st.success(
+                            f"Added {found_name} ({found_inst or 'no institution on ORCID'})"
+                        )
                         st.rerun()
 
             # Pick from all co-authors on previous papers (already fetched from ORCID)
             all_coauthors = p.get("all_coauthors", [])
             pickable = [n for n in all_coauthors if n not in p["selected_colleagues"]]
             if pickable:
-                with st.expander(f"Or pick from your {len(all_coauthors)} ORCID co-authors"):
-                    pick_filter = st.text_input("Filter by name", key="coauthor_pick_filter", placeholder="type to filter…")
-                    filtered = [n for n in pickable if pick_filter.lower() in n.lower()] if pick_filter else pickable
+                with st.expander(
+                    f"Or pick from your {len(all_coauthors)} ORCID co-authors"
+                ):
+                    pick_filter = st.text_input(
+                        "Filter by name",
+                        key="coauthor_pick_filter",
+                        placeholder="type to filter…",
+                    )
+                    filtered = (
+                        [n for n in pickable if pick_filter.lower() in n.lower()]
+                        if pick_filter
+                        else pickable
+                    )
                     for name in filtered[:30]:
                         if st.button(f"+ {name}", key=f"pick_coauthor_{name}"):
                             p["selected_colleagues"].append(name)
                             st.rerun()
                     if len(filtered) > 30:
-                        st.caption(f"Showing 30 of {len(filtered)} — type more to narrow.")
+                        st.caption(
+                            f"Showing 30 of {len(filtered)} — type more to narrow."
+                        )
 
             if st.button("✓ Looks good — import", type="primary"):
                 _commit_preview()
                 st.rerun()
 
     # ── Continue button (always visible at bottom of Section 1) ──
-    if st.button("Looks good — continue to Step 2 →", key="s1_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 2 →", key="s1_continue", type="primary"
+    ):
         st.session_state.current_step = 2
         st.rerun()
 
@@ -1359,22 +2073,46 @@ with st.expander("**1. Your ORCID**", expanded=(st.session_state.current_step ==
 with st.expander("**2. Your Profile**", expanded=(st.session_state.current_step == 2)):
     col1, col2 = st.columns(2)
     with col1:
-        researcher_name = st.text_input("Your name", placeholder="Jane Smith", key="profile_name")
-        institution = st.text_input("Institution (optional)", placeholder="Aarhus University", key="profile_institution")
+        researcher_name = st.text_input(
+            "Your name", placeholder="Jane Smith", key="profile_name"
+        )
+        institution = st.text_input(
+            "Institution (optional)",
+            placeholder="Aarhus University",
+            key="profile_institution",
+        )
     with col2:
-        digest_name = st.text_input("Digest name", value="arXiv Digest", help="Appears in the email subject line")
-        department = st.text_input("Department (optional)", placeholder="Dept. of Physics & Astronomy", key="profile_department")
+        digest_name = st.text_input(
+            "Digest name",
+            value="arXiv Digest",
+            help="Appears in the email subject line",
+        )
+        department = st.text_input(
+            "Department (optional)",
+            placeholder="Dept. of Physics & Astronomy",
+            key="profile_department",
+        )
 
-    tagline = st.text_input("Footer tagline (optional)", placeholder="Ad astra per aspera", help="A quote or motto for the email footer")
+    tagline = st.text_input(
+        "Footer tagline (optional)",
+        placeholder="Ad astra per aspera",
+        help="A quote or motto for the email footer",
+    )
 
     # ── Self-match (your own name on arXiv) ──
     # This block appears exactly once — here in Section 2.
-    st.markdown("**Your name on arXiv** — if you publish a paper, you'll get a special celebration in your digest!")
+    st.markdown(
+        "**Your name on arXiv** — if you publish a paper, you'll get a special celebration in your digest!"
+    )
     col1, col2 = st.columns([3, 1])
     with col1:
-        new_self = st.text_input("Author match pattern", placeholder="Smith, J", key="self_match_input",
-                                  label_visibility="collapsed",
-                                  help="How your name appears in arXiv author lists (e.g. 'Smith, J' or 'Jane Smith')")
+        new_self = st.text_input(
+            "Author match pattern",
+            placeholder="Smith, J",
+            key="self_match_input",
+            label_visibility="collapsed",
+            help="How your name appears in arXiv author lists (e.g. 'Smith, J' or 'Jane Smith')",
+        )
     with col2:
         if st.button("Add", key="add_self_match", use_container_width=True):
             if new_self.strip() and new_self.strip() not in st.session_state.self_match:
@@ -1394,7 +2132,9 @@ with st.expander("**2. Your Profile**", expanded=(st.session_state.current_step 
             st.session_state.self_match.remove(p)
             st.rerun()
 
-    if st.button("Looks good — continue to Step 3 →", key="s2_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 3 →", key="s2_continue", type="primary"
+    ):
         st.session_state.current_step = 3
         st.rerun()
 
@@ -1416,7 +2156,9 @@ tagline = st.session_state.get("_s2_tagline", "")
 #  Section 3: Research Description
 # ─────────────────────────────────────────────────────────────
 
-with st.expander("**3. Your Research Description**", expanded=(st.session_state.current_step == 3)):
+with st.expander(
+    "**3. Your Research Description**", expanded=(st.session_state.current_step == 3)
+):
     if ai_assist:
         if st.session_state.research_description:
             st.markdown(
@@ -1429,7 +2171,9 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
                 "We'll use this to **suggest arXiv categories and score keywords** for you."
             )
     else:
-        st.markdown("Describe your research in 3-5 sentences. This is what the AI uses to score papers.")
+        st.markdown(
+            "Describe your research in 3-5 sentences. This is what the AI uses to score papers."
+        )
 
     research_context_widget = st.text_area(
         "Research context",
@@ -1447,9 +2191,13 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
     _orcid_titles = st.session_state.get("_orcid_titles", [])
     if _orcid_titles:
         _total_papers = len(_orcid_titles)
-        _smart_threshold = 10  # use smart pre-selection when user has this many or more papers
+        _smart_threshold = (
+            10  # use smart pre-selection when user has this many or more papers
+        )
 
-        def _smart_paper_default(titles: list[str], works_meta: list[dict], cap: int = 10) -> list[str]:
+        def _smart_paper_default(
+            titles: list[str], works_meta: list[dict], cap: int = 10
+        ) -> list[str]:
             """
             Return a smart default selection of up to `cap` papers.
 
@@ -1484,7 +2232,9 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
             # First render or stale state: compute the default
             if _total_papers >= _smart_threshold:
                 _works_meta = st.session_state.get("_orcid_works_meta", [])
-                _default_selection = _smart_paper_default(_orcid_titles, _works_meta, cap=_smart_threshold)
+                _default_selection = _smart_paper_default(
+                    _orcid_titles, _works_meta, cap=_smart_threshold
+                )
                 _selection_note = (
                     f"{_total_papers} papers found — showing smart selection of "
                     f"{len(_default_selection)} most recent"
@@ -1496,11 +2246,15 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
             _default_selection = _existing
             _selection_note = ""
 
-        st.markdown("**Which papers should we use to suggest your keywords?** (select the most representative ones)")
+        st.markdown(
+            "**Which papers should we use to suggest your keywords?** (select the most representative ones)"
+        )
         if _total_papers >= _smart_threshold and _selection_note:
             st.caption(_selection_note)
         else:
-            st.caption("All fetched from your ORCID profile. Deselect papers from unrelated projects.")
+            st.caption(
+                "All fetched from your ORCID profile. Deselect papers from unrelated projects."
+            )
 
         _new_selection = st.multiselect(
             "Papers for keyword suggestions",
@@ -1538,12 +2292,17 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
                 st.session_state.ai_suggested_cats = suggest_categories(_ai_context)
                 st.session_state.ai_suggested_kws = suggest_keywords_from_context(
                     _ai_context,
-                    orcid_keywords=st.session_state.keywords if _has_orcid_kws else None,
+                    orcid_keywords=st.session_state.keywords
+                    if _has_orcid_kws
+                    else None,
                 )
                 if _api_available and _has_orcid_kws:
                     # Merge: keep all existing keywords; update scores where AI returned one.
                     # Case-insensitive match: build a lowercased lookup from AI results.
-                    ai_lower = {k.lower(): v for k, v in st.session_state.ai_suggested_kws.items()}
+                    ai_lower = {
+                        k.lower(): v
+                        for k, v in st.session_state.ai_suggested_kws.items()
+                    }
                     merged_kws = dict(st.session_state.keywords)
                     for kw in list(merged_kws.keys()):
                         ai_score = ai_lower.get(kw.lower())
@@ -1555,19 +2314,29 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
             _btn_label = (
                 "🤖 Re-score categories & keywords"
                 if _cats_already_suggested
-                else ("🤖 Suggest categories & score keywords" if _api_available
-                      else "🤖 Suggest categories & keywords")
+                else (
+                    "🤖 Suggest categories & score keywords"
+                    if _api_available
+                    else "🤖 Suggest categories & keywords"
+                )
             )
-            if st.button(_btn_label, type="secondary" if _cats_already_suggested else "primary"):
+            if st.button(
+                _btn_label, type="secondary" if _cats_already_suggested else "primary"
+            ):
                 st.session_state.ai_suggested_cats = suggest_categories(_ai_context)
                 st.session_state.ai_suggested_kws = suggest_keywords_from_context(
                     _ai_context,
-                    orcid_keywords=st.session_state.keywords if _has_orcid_kws else None,
+                    orcid_keywords=st.session_state.keywords
+                    if _has_orcid_kws
+                    else None,
                 )
                 if _api_available and _has_orcid_kws:
                     # Merge: keep all existing keywords; update scores where AI returned one.
                     # Case-insensitive match: build a lowercased lookup from AI results.
-                    ai_lower = {k.lower(): v for k, v in st.session_state.ai_suggested_kws.items()}
+                    ai_lower = {
+                        k.lower(): v
+                        for k, v in st.session_state.ai_suggested_kws.items()
+                    }
                     merged_kws = dict(st.session_state.keywords)
                     for kw in list(merged_kws.keys()):
                         ai_score = ai_lower.get(kw.lower())
@@ -1576,9 +2345,13 @@ with st.expander("**3. Your Research Description**", expanded=(st.session_state.
                     st.session_state.keywords = merged_kws
 
         if st.session_state.ai_suggested_cats:
-            st.success(f"Suggested {len(st.session_state.ai_suggested_cats)} categories and {len(st.session_state.ai_suggested_kws)} keywords — review them below.")
+            st.success(
+                f"Suggested {len(st.session_state.ai_suggested_cats)} categories and {len(st.session_state.ai_suggested_kws)} keywords — review them below."
+            )
 
-    if st.button("Looks good — continue to Step 4 →", key="s3_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 4 →", key="s3_continue", type="primary"
+    ):
         st.session_state.current_step = 4
         st.rerun()
 
@@ -1600,10 +2373,14 @@ if "selected_categories" not in st.session_state:
     st.session_state.selected_categories = set(ai_suggested_set)
 
 # If AI suggestions just arrived, merge them into the selection
-if ai_suggested_set and not st.session_state.selected_categories.issuperset(ai_suggested_set):
+if ai_suggested_set and not st.session_state.selected_categories.issuperset(
+    ai_suggested_set
+):
     st.session_state.selected_categories.update(ai_suggested_set)
 
-with st.expander("**4. arXiv Categories**", expanded=(st.session_state.current_step == 4)):
+with st.expander(
+    "**4. arXiv Categories**", expanded=(st.session_state.current_step == 4)
+):
     if ai_assist and ai_suggested_set:
         st.success(
             f"AI suggested {len(ai_suggested_set)} categories based on your research description. "
@@ -1620,7 +2397,9 @@ with st.expander("**4. arXiv Categories**", expanded=(st.session_state.current_s
     to_remove = set()
 
     for group_name, group_cats in ARXIV_GROUPS.items():
-        selected_in_group = [c for c in group_cats if c in st.session_state.selected_categories]
+        selected_in_group = [
+            c for c in group_cats if c in st.session_state.selected_categories
+        ]
         n_selected = len(selected_in_group)
         n_total = len(group_cats)
         hint = ARXIV_GROUP_HINTS.get(group_name, "")
@@ -1635,22 +2414,29 @@ with st.expander("**4. arXiv Categories**", expanded=(st.session_state.current_s
 
             col_all, col_none, col_spacer = st.columns([1, 1, 4])
             with col_all:
-                if st.button("Select all", key=f"grp_all_{group_name}", use_container_width=True):
+                if st.button(
+                    "Select all", key=f"grp_all_{group_name}", use_container_width=True
+                ):
                     to_add.update(group_cats)
             with col_none:
-                if st.button("Clear", key=f"grp_none_{group_name}", use_container_width=True):
+                if st.button(
+                    "Clear", key=f"grp_none_{group_name}", use_container_width=True
+                ):
                     to_remove.update(group_cats)
 
             for cat_id in group_cats:
                 label = ARXIV_CATEGORIES.get(cat_id, cat_id)
                 is_selected = cat_id in st.session_state.selected_categories
                 # ✦ marks AI-suggested categories (Unicode, not an emoji)
-                display_label = f"{label} \u2726" if cat_id in ai_suggested_set else label
+                display_label = (
+                    f"{label} \u2726" if cat_id in ai_suggested_set else label
+                )
                 checked = st.checkbox(
                     display_label,
                     value=is_selected,
                     key=f"cat_{cat_id}",
-                    help=f"`{cat_id}`" + (" — AI suggested" if cat_id in ai_suggested_set else ""),
+                    help=f"`{cat_id}`"
+                    + (" — AI suggested" if cat_id in ai_suggested_set else ""),
                 )
                 if checked and not is_selected:
                     to_add.add(cat_id)
@@ -1674,7 +2460,9 @@ with st.expander("**4. arXiv Categories**", expanded=(st.session_state.current_s
     else:
         st.info("No categories selected yet. Expand a group above to choose.")
 
-    if st.button("Looks good — continue to Step 5 →", key="s4_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 5 →", key="s4_continue", type="primary"
+    ):
         st.session_state.current_step = 5
         st.rerun()
 
@@ -1687,19 +2475,28 @@ categories = sorted(st.session_state.selected_categories)
 # ─────────────────────────────────────────────────────────────
 
 with st.expander("**5. Keywords**", expanded=(st.session_state.current_step == 5)):
-    st.markdown("Papers matching these keywords get pre-filtered before AI scoring. Higher weight = more important.")
+    st.markdown(
+        "Papers matching these keywords get pre-filtered before AI scoring. Higher weight = more important."
+    )
 
     # If AI suggested keywords, offer to add them
     if ai_assist and st.session_state.ai_suggested_kws:
-        new_suggestions = {k: v for k, v in st.session_state.ai_suggested_kws.items()
-                           if k not in st.session_state.keywords}
+        new_suggestions = {
+            k: v
+            for k, v in st.session_state.ai_suggested_kws.items()
+            if k not in st.session_state.keywords
+        }
         if new_suggestions:
             st.markdown("**Suggested keywords** — click to add:")
             cols = st.columns(3)
             to_add = {}
             for i, (kw, weight) in enumerate(new_suggestions.items()):
                 with cols[i % 3]:
-                    if st.button(f"+ {kw} ({weight})", key=f"add_sug_{kw}", use_container_width=True):
+                    if st.button(
+                        f"+ {kw} ({weight})",
+                        key=f"add_sug_{kw}",
+                        use_container_width=True,
+                    ):
                         to_add[kw] = weight
             if to_add:
                 st.session_state.keywords.update(to_add)
@@ -1713,9 +2510,16 @@ with st.expander("**5. Keywords**", expanded=(st.session_state.current_step == 5
     st.markdown("**Add keyword manually:**")
     col1, col2, col3 = st.columns([3, 2, 1])
     with col1:
-        new_kw = st.text_input("Keyword", placeholder="transmission spectroscopy", label_visibility="collapsed", key="new_kw_input")
+        new_kw = st.text_input(
+            "Keyword",
+            placeholder="transmission spectroscopy",
+            label_visibility="collapsed",
+            key="new_kw_input",
+        )
     with col2:
-        new_weight = st.slider("Weight", 1, 10, 7, label_visibility="collapsed", key="new_kw_weight")
+        new_weight = st.slider(
+            "Weight", 1, 10, 7, label_visibility="collapsed", key="new_kw_weight"
+        )
         st.caption(f"_{_weight_label(new_weight)}_")
     with col3:
         if st.button("Add", use_container_width=True, key="add_kw_btn"):
@@ -1728,23 +2532,36 @@ with st.expander("**5. Keywords**", expanded=(st.session_state.current_step == 5
         st.markdown("**Your keywords:**")
         _kw_col_all, _kw_col_clear, _kw_col_spacer = st.columns([1, 1, 4])
         with _kw_col_all:
-            if st.button("Select all", key="kw_select_all", use_container_width=True,
-                         help="Set all keyword weights to 10"):
+            if st.button(
+                "Select all",
+                key="kw_select_all",
+                use_container_width=True,
+                help="Set all keyword weights to 10",
+            ):
                 st.session_state.keywords = {k: 10 for k in st.session_state.keywords}
                 st.rerun()
         with _kw_col_clear:
-            if st.button("Clear all", key="kw_clear_all", use_container_width=True,
-                         help="Set all keyword weights to 1"):
+            if st.button(
+                "Clear all",
+                key="kw_clear_all",
+                use_container_width=True,
+                help="Set all keyword weights to 1",
+            ):
                 st.session_state.keywords = {k: 1 for k in st.session_state.keywords}
                 st.rerun()
         to_remove = []
-        for kw, weight in sorted(st.session_state.keywords.items(), key=lambda x: -x[1]):
+        for kw, weight in sorted(
+            st.session_state.keywords.items(), key=lambda x: -x[1]
+        ):
             col1, col2, col3 = st.columns([3, 2, 1])
             with col1:
                 st.markdown(f"`{kw}`")
             with col2:
                 new_w = st.slider(
-                    "weight", 1, 10, weight,
+                    "weight",
+                    1,
+                    10,
+                    weight,
                     key=f"kw_slider_{kw}",
                     label_visibility="collapsed",
                 )
@@ -1758,9 +2575,13 @@ with st.expander("**5. Keywords**", expanded=(st.session_state.current_step == 5
             del st.session_state.keywords[kw]
             st.rerun()
     else:
-        st.info("No keywords yet. Add some above, scan your Pure profile, or use AI suggestions.")
+        st.info(
+            "No keywords yet. Add some above, scan your Pure profile, or use AI suggestions."
+        )
 
-    if st.button("Looks good — continue to Step 6 →", key="s5_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 6 →", key="s5_continue", type="primary"
+    ):
         st.session_state.current_step = 6
         st.rerun()
 
@@ -1769,10 +2590,16 @@ with st.expander("**5. Keywords**", expanded=(st.session_state.current_step == 5
 #  Section 6: Research Authors
 # ─────────────────────────────────────────────────────────────
 
-with st.expander("**6. Research Authors**", expanded=(st.session_state.current_step == 6)):
-    st.markdown("Papers by these people get a relevance boost. Use partial name strings (e.g. 'Madhusudhan').")
+with st.expander(
+    "**6. Research Authors**", expanded=(st.session_state.current_step == 6)
+):
+    st.markdown(
+        "Papers by these people get a relevance boost. Use partial name strings (e.g. 'Madhusudhan')."
+    )
 
-    new_author = st.text_input("Add research author", placeholder="Madhusudhan", key="new_ra_input")
+    new_author = st.text_input(
+        "Add research author", placeholder="Madhusudhan", key="new_ra_input"
+    )
     if st.button("Add author") and new_author.strip():
         if new_author.strip() not in st.session_state.research_authors:
             st.session_state.research_authors.append(new_author.strip())
@@ -1791,7 +2618,9 @@ with st.expander("**6. Research Authors**", expanded=(st.session_state.current_s
             st.session_state.research_authors.remove(a)
             st.rerun()
 
-    if st.button("Looks good — continue to Step 7 →", key="s6_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 7 →", key="s6_continue", type="primary"
+    ):
         st.session_state.current_step = 7
         st.rerun()
 
@@ -1801,21 +2630,31 @@ with st.expander("**6. Research Authors**", expanded=(st.session_state.current_s
 # ─────────────────────────────────────────────────────────────
 
 with st.expander("**7. Colleagues**", expanded=(st.session_state.current_step == 7)):
-    st.markdown("Papers by colleagues always appear in a special section, even if off-topic. Great for staying social!")
+    st.markdown(
+        "Papers by colleagues always appear in a special section, even if off-topic. Great for staying social!"
+    )
 
     st.markdown("**People:**")
     col1, col2 = st.columns([2, 2])
     with col1:
-        new_coll_name = st.text_input("Colleague name", placeholder="Jane Smith", key="new_coll_name")
+        new_coll_name = st.text_input(
+            "Colleague name", placeholder="Jane Smith", key="new_coll_name"
+        )
     with col2:
-        new_coll_match = st.text_input("Match pattern", placeholder="Smith, J", key="new_coll_match",
-                                        help="How their name appears in arXiv author lists")
+        new_coll_match = st.text_input(
+            "Match pattern",
+            placeholder="Smith, J",
+            key="new_coll_match",
+            help="How their name appears in arXiv author lists",
+        )
 
     if st.button("Add colleague") and new_coll_name.strip() and new_coll_match.strip():
-        st.session_state.colleagues_people.append({
-            "name": new_coll_name.strip(),
-            "match": [new_coll_match.strip()],
-        })
+        st.session_state.colleagues_people.append(
+            {
+                "name": new_coll_name.strip(),
+                "match": [new_coll_match.strip()],
+            }
+        )
         st.rerun()
 
     if st.session_state.colleagues_people:
@@ -1838,6 +2677,7 @@ with st.expander("**7. Colleagues**", expanded=(st.session_state.current_step ==
     _cmap = st.session_state.get("_orcid_coauthor_map", {})
     if _cmap:
         from collections import Counter as _Counter
+
         # Count how many map entries each name appears in (proxy for shared-paper frequency)
         _name_freq: _Counter = _Counter(_cmap.values())
         # Remove the user themselves by checking against their profile name
@@ -1855,7 +2695,9 @@ with st.expander("**7. Colleagues**", expanded=(st.session_state.current_step ==
         _top_coauthors = _candidates[:5]
 
         if len(_top_coauthors) >= 2:
-            st.markdown("**Suggested colleagues** — based on your most frequent co-authors:")
+            st.markdown(
+                "**Suggested colleagues** — based on your most frequent co-authors:"
+            )
             st.caption("One-click to add them to your People to Track list.")
             for _ca_name, _ca_count in _top_coauthors:
                 _shared_label = f"{'paper' if _ca_count == 1 else 'papers'}"
@@ -1865,17 +2707,29 @@ with st.expander("**7. Colleagues**", expanded=(st.session_state.current_step ==
                 with _col_count:
                     st.caption(f"{_ca_count} shared {_shared_label}")
                 with _col_btn:
-                    if st.button("+ Add", key=f"suggest_coll_{_ca_name}", use_container_width=True):
+                    if st.button(
+                        "+ Add",
+                        key=f"suggest_coll_{_ca_name}",
+                        use_container_width=True,
+                    ):
                         _parts = _ca_name.split()
-                        _match_pat = f"{_parts[-1]}, {_parts[0][0]}" if len(_parts) >= 2 else _ca_name
-                        st.session_state.colleagues_people.append({
-                            "name": _ca_name,
-                            "match": [_match_pat],
-                        })
+                        _match_pat = (
+                            f"{_parts[-1]}, {_parts[0][0]}"
+                            if len(_parts) >= 2
+                            else _ca_name
+                        )
+                        st.session_state.colleagues_people.append(
+                            {
+                                "name": _ca_name,
+                                "match": [_match_pat],
+                            }
+                        )
                         st.rerun()
 
     st.markdown("**Institutions** (match against abstract text):")
-    new_inst = st.text_input("Add institution", placeholder="Aarhus University", key="new_inst_input")
+    new_inst = st.text_input(
+        "Add institution", placeholder="Aarhus University", key="new_inst_input"
+    )
     if st.button("Add institution") and new_inst.strip():
         if new_inst.strip() not in st.session_state.colleagues_institutions:
             st.session_state.colleagues_institutions.append(new_inst.strip())
@@ -1895,7 +2749,9 @@ with st.expander("**7. Colleagues**", expanded=(st.session_state.current_step ==
         if to_remove:
             st.rerun()
 
-    if st.button("Looks good — continue to Step 8 →", key="s7_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 8 →", key="s7_continue", type="primary"
+    ):
         st.session_state.current_step = 8
         st.rerun()
 
@@ -1904,7 +2760,9 @@ with st.expander("**7. Colleagues**", expanded=(st.session_state.current_step ==
 #  Section 8: Digest Mode & Schedule
 # ─────────────────────────────────────────────────────────────
 
-with st.expander("**8. Digest Mode & Schedule**", expanded=(st.session_state.current_step == 8)):
+with st.expander(
+    "**8. Digest Mode & Schedule**", expanded=(st.session_state.current_step == 8)
+):
     # ── Digest mode ──
     st.markdown("**How much do you want to read?**")
     digest_mode = st.radio(
@@ -1920,9 +2778,25 @@ with st.expander("**8. Digest Mode & Schedule**", expanded=(st.session_state.cur
 
     # Show what the mode means
     if digest_mode == "highlights":
-        st.caption("Default: up to 6 papers, min score 5/10. Only the most relevant papers make it through.")
+        st.caption(
+            "Default: up to 6 papers, min score 5/10. Only the most relevant papers make it through."
+        )
     else:
-        st.caption("Default: up to 15 papers, min score 2/10. Casts a wider net — great for staying broadly informed.")
+        st.caption(
+            "Default: up to 15 papers, min score 2/10. Casts a wider net — great for staying broadly informed."
+        )
+
+    st.markdown("**Recipient email view**")
+    recipient_view_mode = st.radio(
+        "Recipient email view",
+        options=["deep_read", "5_min_skim"],
+        format_func=lambda x: {
+            "deep_read": "📖 Deep read — full cards with expanded context",
+            "5_min_skim": "⚡ 5-minute skim — top 3 papers, one-line summaries",
+        }[x],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
 
     # ── Advanced overrides ──
     mode_defaults = {"highlights": (6, 5), "in_depth": (15, 2)}
@@ -1933,9 +2807,16 @@ with st.expander("**8. Digest Mode & Schedule**", expanded=(st.session_state.cur
     with st.expander("Fine-tune (optional)"):
         col1, col2 = st.columns(2)
         with col1:
-            max_papers = st.number_input("Max papers per digest", min_value=1, max_value=30, value=default_max)
+            max_papers = st.number_input(
+                "Max papers per digest", min_value=1, max_value=30, value=default_max
+            )
         with col2:
-            min_score = st.number_input("Min relevance score (1-10)", min_value=1, max_value=10, value=default_min)
+            min_score = st.number_input(
+                "Min relevance score (1-10)",
+                min_value=1,
+                max_value=10,
+                value=default_min,
+            )
 
         override_max = max_papers != default_max
         override_min = min_score != default_min
@@ -1962,7 +2843,9 @@ with st.expander("**8. Digest Mode & Schedule**", expanded=(st.session_state.cur
     days_back = schedule_days_back[schedule]
 
     with st.expander("Override days back"):
-        days_back = st.number_input("Days to look back", min_value=1, max_value=14, value=days_back)
+        days_back = st.number_input(
+            "Days to look back", min_value=1, max_value=14, value=days_back
+        )
 
     st.caption(f"Will look back **{days_back} days** for new papers.")
 
@@ -1970,7 +2853,9 @@ with st.expander("**8. Digest Mode & Schedule**", expanded=(st.session_state.cur
     st.markdown("**What time should it arrive?** (UTC)")
     send_hour_utc = st.slider(
         "Send hour (UTC)",
-        min_value=0, max_value=23, value=7,
+        min_value=0,
+        max_value=23,
+        value=7,
         help="Default is 7 UTC = 9am Danish time (CET). Adjust for your timezone.",
         label_visibility="collapsed",
     )
@@ -2009,48 +2894,71 @@ with st.expander("**8. Digest Mode & Schedule**", expanded=(st.session_state.cur
     st.session_state["_s8_override_min"] = override_min
     st.session_state["_s8_max_papers"] = max_papers
     st.session_state["_s8_min_score"] = min_score
+    st.session_state["_s8_recipient_view_mode"] = recipient_view_mode
 
-    if st.button("Looks good — continue to Step 9 →", key="s8_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 9 →", key="s8_continue", type="primary"
+    ):
         st.session_state.current_step = 9
         st.rerun()
 
 # Read Section 8 outputs — valid whether the expander is open or collapsed
 digest_mode = st.session_state.get("_s8_digest_mode", "highlights")
 schedule = st.session_state.get("_s8_schedule", "mon_wed_fri")
-schedule_options = st.session_state.get("_s8_schedule_options", {
-    "mon_wed_fri": "Mon / Wed / Fri",
-    "daily": "Every weekday (Mon–Fri)",
-    "weekly": "Once a week (Monday)",
-})
+schedule_options = st.session_state.get(
+    "_s8_schedule_options",
+    {
+        "mon_wed_fri": "Mon / Wed / Fri",
+        "daily": "Every weekday (Mon–Fri)",
+        "weekly": "Once a week (Monday)",
+    },
+)
 send_hour_utc = st.session_state.get("_s8_send_hour_utc", 7)
 days_back = st.session_state.get("_s8_days_back", 4)
 cron_expr = st.session_state.get("_s8_cron_expr", f"0 7 * * 1,3,5")
 override_max = st.session_state.get("_s8_override_max", False)
 override_min = st.session_state.get("_s8_override_min", False)
-_def_max, _def_min = {"highlights": (6, 5), "in_depth": (15, 2)}.get(digest_mode, (6, 5))
+_def_max, _def_min = {"highlights": (6, 5), "in_depth": (15, 2)}.get(
+    digest_mode, (6, 5)
+)
 max_papers = st.session_state.get("_s8_max_papers", _def_max)
 min_score_val = st.session_state.get("_s8_min_score", _def_min)
+recipient_view_mode = st.session_state.get("_s8_recipient_view_mode", "deep_read")
 
 
 # ─────────────────────────────────────────────────────────────
 #  Section 9: Email Provider
 # ─────────────────────────────────────────────────────────────
 
-with st.expander("**9. Email Provider**", expanded=(st.session_state.current_step == 9)):
-    smtp_options = {"Gmail": ("smtp.gmail.com", 587), "Outlook / Office 365": ("smtp.office365.com", 587)}
-    smtp_choice = st.radio("SMTP provider", options=list(smtp_options.keys()), horizontal=True,
-                            label_visibility="collapsed")
+with st.expander(
+    "**9. Email Provider**", expanded=(st.session_state.current_step == 9)
+):
+    smtp_options = {
+        "Gmail": ("smtp.gmail.com", 587),
+        "Outlook / Office 365": ("smtp.office365.com", 587),
+    }
+    smtp_choice = st.radio(
+        "SMTP provider",
+        options=list(smtp_options.keys()),
+        horizontal=True,
+        label_visibility="collapsed",
+    )
     smtp_server, smtp_port = smtp_options[smtp_choice]
 
-    github_repo = st.text_input("GitHub repo (optional)", placeholder="username/arxiv-digest",
-                                 help="Enables self-service links in emails")
+    github_repo = st.text_input(
+        "GitHub repo (optional)",
+        placeholder="username/arxiv-digest",
+        help="Enables self-service links in emails",
+    )
 
     # Persist so Section 10 can read when Section 9 is collapsed
     st.session_state["_s9_smtp_server"] = smtp_server
     st.session_state["_s9_smtp_port"] = smtp_port
     st.session_state["_s9_github_repo"] = github_repo
 
-    if st.button("Looks good — continue to Step 10 →", key="s9_continue", type="primary"):
+    if st.button(
+        "Looks good — continue to Step 10 →", key="s9_continue", type="primary"
+    ):
         st.session_state.current_step = 10
         st.rerun()
 
@@ -2064,7 +2972,9 @@ github_repo = st.session_state.get("_s9_github_repo", "")
 #  Section 10: Preview & Download
 # ─────────────────────────────────────────────────────────────
 
-with st.expander("**10. Preview & Download**", expanded=(st.session_state.current_step == 10)):
+with st.expander(
+    "**10. Preview & Download**", expanded=(st.session_state.current_step == 10)
+):
     st.markdown("### Your config.yaml is ready")
 
     # Build config dict
@@ -2072,8 +2982,18 @@ with st.expander("**10. Preview & Download**", expanded=(st.session_state.curren
         "digest_name": digest_name or "arXiv Digest",
         "researcher_name": researcher_name or "Reader",
         "research_context": research_context or "",
-        "categories": categories if categories else ["astro-ph.EP", "astro-ph.SR", "astro-ph.GA", "astro-ph.HE", "astro-ph.IM"],
-        "keywords": dict(st.session_state.keywords) if st.session_state.keywords else {"example keyword": 5},
+        "categories": categories
+        if categories
+        else [
+            "astro-ph.EP",
+            "astro-ph.SR",
+            "astro-ph.GA",
+            "astro-ph.HE",
+            "astro-ph.IM",
+        ],
+        "keywords": dict(st.session_state.keywords)
+        if st.session_state.keywords
+        else {"example keyword": 5},
         "self_match": list(st.session_state.self_match),
         "research_authors": list(st.session_state.research_authors),
         "colleagues": {
@@ -2081,6 +3001,7 @@ with st.expander("**10. Preview & Download**", expanded=(st.session_state.curren
             "institutions": list(st.session_state.colleagues_institutions),
         },
         "digest_mode": digest_mode,
+        "recipient_view_mode": recipient_view_mode,
         "days_back": days_back,
         "schedule": schedule,
         "send_hour_utc": send_hour_utc,
@@ -2098,7 +3019,9 @@ with st.expander("**10. Preview & Download**", expanded=(st.session_state.curren
     if override_min:
         config["min_score"] = min_score_val
 
-    config_yaml = yaml.dump(config, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    config_yaml = yaml.dump(
+        config, default_flow_style=False, sort_keys=False, allow_unicode=True
+    )
 
     tab1, tab2 = st.tabs(["config.yaml", "Workflow cron"])
 
@@ -2106,10 +3029,17 @@ with st.expander("**10. Preview & Download**", expanded=(st.session_state.curren
         st.code(config_yaml, language="yaml")
 
     with tab2:
-        st.markdown("If you change the schedule from the default (Mon/Wed/Fri 7am UTC), update this line in `.github/workflows/digest.yml`:")
-        st.code(f"    - cron: '{cron_expr}'  # {schedule_options.get(schedule, schedule)} at {send_hour_utc}:00 UTC", language="yaml")
+        st.markdown(
+            "If you change the schedule from the default (Mon/Wed/Fri 7am UTC), update this line in `.github/workflows/digest.yml`:"
+        )
+        st.code(
+            f"    - cron: '{cron_expr}'  # {schedule_options.get(schedule, schedule)} at {send_hour_utc}:00 UTC",
+            language="yaml",
+        )
         if schedule != "mon_wed_fri" or send_hour_utc != 7:
-            st.warning("Your schedule differs from the default. Remember to update the cron line in your workflow file after forking!")
+            st.warning(
+                "Your schedule differs from the default. Remember to update the cron line in your workflow file after forking!"
+            )
 
     col1, col2 = st.columns(2)
     with col1:
@@ -2149,7 +3079,8 @@ Since you chose <strong>{schedule_options.get(schedule, schedule)} at {send_hour
 </div>
 """
 
-st.markdown(f"""
+st.markdown(
+    f"""
 <div class="brand-card">
 <p><span class="step-number">1</span> <strong>Fork the template repo</strong></p>
 <p style="margin-left: 36px;">
@@ -2174,22 +3105,34 @@ Go to your fork's <strong>Settings → Secrets and variables → Actions</strong
 </div>
 
 {schedule_note}
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 _smtp_user, _smtp_password = _server_smtp()
 _server_gemini = _has_server_key()
 
 if _smtp_user and _smtp_password:
     # Pre-filled secrets — user only needs to add RECIPIENT_EMAIL
-    st.markdown("**Copy these secrets into your fork** (Settings → Secrets and variables → Actions):")
+    st.markdown(
+        "**Copy these secrets into your fork** (Settings → Secrets and variables → Actions):"
+    )
     _secrets_block = f"RECIPIENT_EMAIL = your-email@example.com  ← change this\nSMTP_USER      = {_smtp_user}\nSMTP_PASSWORD  = {_smtp_password}"
     if not _server_gemini:
-        _secrets_block += "\nGEMINI_API_KEY = your-key  ← get free at aistudio.google.com"
+        _secrets_block += (
+            "\nGEMINI_API_KEY = your-key  ← get free at aistudio.google.com"
+        )
     st.code(_secrets_block, language="ini")
-    st.caption("Emails will be sent from **" + _smtp_user + "**. Change only the `RECIPIENT_EMAIL` line to your own address.")
+    st.caption(
+        "Emails will be sent from **"
+        + _smtp_user
+        + "**. Change only the `RECIPIENT_EMAIL` line to your own address."
+    )
 else:
     # No server SMTP — user configures their own
-    st.markdown("**Add these secrets to your fork** (Settings → Secrets and variables → Actions):")
+    st.markdown(
+        "**Add these secrets to your fork** (Settings → Secrets and variables → Actions):"
+    )
     st.code(
         "RECIPIENT_EMAIL = your-email@example.com\n"
         "SMTP_USER       = your-gmail@gmail.com\n"
@@ -2202,16 +3145,21 @@ else:
         "[App passwords](https://myaccount.google.com/apppasswords)"
     )
 
-st.success(f"That's it! Your digest will run {schedule_options.get(schedule, schedule).lower()} at {send_hour_utc}:00 UTC. 🎉")
+st.success(
+    f"That's it! Your digest will run {schedule_options.get(schedule, schedule).lower()} at {send_hour_utc}:00 UTC. 🎉"
+)
 
 st.divider()
 
 # ── Footer ──
-st.markdown(f"""
+st.markdown(
+    f"""
 <div style="text-align: center; font-family: 'DM Mono', monospace; font-size: 10px;
      letter-spacing: 0.1em; color: {WARM_GREY}; margin-top: 24px; margin-bottom: 24px;">
      Built by <a href="https://silkedainese.github.io" style="color: {PINE};">Silke S. Dainese</a> ·
      <a href="mailto:dainese@phys.au.dk" style="color: {WARM_GREY};">dainese@phys.au.dk</a> ·
      <a href="https://github.com/SilkeDainese" style="color: {WARM_GREY};">GitHub</a>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)

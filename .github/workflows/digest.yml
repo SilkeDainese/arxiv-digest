@@ -54,6 +54,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
@@ -66,8 +67,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add keyword_stats.json || true
-          git diff --cached --quiet || git commit -m "📊 Update keyword stats [skip ci]"
+          git add keyword_stats.json feedback_stats.json || true
+          git diff --cached --quiet || git commit -m "📊 Update digest stats [skip ci]"
           git pull --rebase || true
           git push || true
 
@@ -79,4 +80,5 @@ jobs:
           path: |
             digest_output.html
             keyword_stats.json
+            feedback_stats.json
           if-no-files-found: ignore
