@@ -72,7 +72,7 @@ STOPWORDS = {
 #  Profile Search (ORCID)
 # ─────────────────────────────────────────────────────────────
 
-def search_pure_profiles(name: str, base_url: str = "https://pure.au.dk") -> list[dict]:
+def search_pure_profiles(name: str, institution: str = "", base_url: str = "https://pure.au.dk") -> list[dict]:
     """
     Search for researcher profiles by name using the ORCID public API.
 
@@ -106,6 +106,9 @@ def search_pure_profiles(name: str, base_url: str = "https://pure.au.dk") -> lis
     else:
         query = name.strip()
 
+    if institution and institution.strip():
+        query += f' AND affiliation-org-name:"{institution.strip()}"'
+
     def _orcid_search(q: str) -> list:
         try:
             resp = requests.get(
@@ -124,7 +127,9 @@ def search_pure_profiles(name: str, base_url: str = "https://pure.au.dk") -> lis
             return []
 
     orcid_ids = _orcid_search(query)
-    # Broader fallback: family name only, in case given-name variant differs
+    # Broader fallback: drop institution constraint first, then try family name only
+    if not orcid_ids and institution and len(parts) >= 2:
+        orcid_ids = _orcid_search(f"given-names:{given} AND family-name:{family}")
     if not orcid_ids and len(parts) >= 2:
         orcid_ids = _orcid_search(f"family-name:{family}")
 

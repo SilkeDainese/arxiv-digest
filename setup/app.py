@@ -676,13 +676,20 @@ if st.session_state.pure_scanned:
         st.rerun()
 
 else:
-    # ── Name search input ──
-    col_input, col_btn = st.columns([4, 1])
-    with col_input:
+    # ── Name + institution search ──
+    col_name, col_inst, col_btn = st.columns([3, 3, 1])
+    with col_name:
         pure_search_name = st.text_input(
             "Your name",
-            placeholder="Silke Dainese",
+            placeholder="Jane Smith",
             key="pure_search_name",
+            label_visibility="collapsed",
+        )
+    with col_inst:
+        pure_search_inst = st.text_input(
+            "University (optional)",
+            placeholder="Aarhus University",
+            key="pure_search_inst",
             label_visibility="collapsed",
         )
     with col_btn:
@@ -690,10 +697,12 @@ else:
 
     if pure_search_name and search_clicked:
         with st.spinner(f"Searching for '{pure_search_name}'..."):
-            st.session_state.pure_search_results = search_pure_profiles(pure_search_name)
+            st.session_state.pure_search_results = search_pure_profiles(
+                pure_search_name, institution=pure_search_inst
+            )
             st.session_state.pure_confirmed_url = ""
         if not st.session_state.pure_search_results:
-            st.warning("No profile found. Try just your last name.")
+            st.warning("No profile found. Try just your last name, or leave university blank.")
 
     # ── Multiple results: pick one ──
     if st.session_state.pure_search_results and len(st.session_state.pure_search_results) > 1:
