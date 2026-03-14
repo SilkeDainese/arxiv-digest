@@ -1349,6 +1349,8 @@ def _render_footer(config: dict[str, Any], scoring_method: str) -> str:
 
     # ── Self-service links ──
     setup_url = config.get("setup_url", DEFAULT_SETUP_URL)
+    subscription_manage_url = str(config.get("subscription_manage_url", "")).strip()
+    subscription_unsubscribe_url = str(config.get("subscription_unsubscribe_url", "")).strip()
     link_style = f"color:{PINE};text-decoration:none"
     service_links: list[str] = []
 
@@ -1360,6 +1362,11 @@ def _render_footer(config: dict[str, Any], scoring_method: str) -> str:
         service_links.append(f'<a href="{setup_url}" style="{link_style}">&#x1F504; Re-run setup wizard</a>')
         service_links.append(f'<a href="{pause_url}" style="{link_style}">&#x23F8;&#xFE0F; Pause digest</a>')
         service_links.append(f'<a href="{delete_url}" style="{link_style}">&#x1F5D1;&#xFE0F; Unsubscribe &amp; delete</a>')
+    elif subscription_manage_url:
+        service_links.append(f'<a href="{subscription_manage_url}" style="{link_style}">&#x2699;&#xFE0F; Change packages</a>')
+        service_links.append(f'<a href="{subscription_manage_url}" style="{link_style}">&#x1F4DD; Manage subscription</a>')
+        if subscription_unsubscribe_url:
+            service_links.append(f'<a href="{subscription_unsubscribe_url}" style="{link_style}">&#x1F5D1;&#xFE0F; Unsubscribe</a>')
     else:
         service_links.append(f'<a href="{setup_url}" style="{link_style}">&#x2699;&#xFE0F; Edit preferences</a>')
 

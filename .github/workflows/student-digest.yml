@@ -1,0 +1,41 @@
+name: AU Student Digest
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send-student-digests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send AU student digests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STUDENT_ADMIN_TOKEN: ${{ secrets.STUDENT_ADMIN_TOKEN }}
+          STUDENT_MANAGE_URL: ${{ vars.STUDENT_MANAGE_URL }}
+          STUDENT_REGISTRY_URL: ${{ vars.STUDENT_REGISTRY_URL }}
+        run: |
+          if [ -z "$STUDENT_ADMIN_TOKEN" ]; then
+            echo "No STUDENT_ADMIN_TOKEN configured; skipping AU student digests."
+            exit 0
+          fi
+          python student_digest.py
