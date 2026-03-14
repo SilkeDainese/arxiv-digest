@@ -801,34 +801,56 @@ else:
         st.caption(f"ORCID: {p['orcid_url']}")
 
         if p.get("research_summary"):
-            st.markdown("**Research summary (AI-generated from your publications):**")
+            st.markdown("**Research summary** — edit freely, this is yours:")
             p["research_summary"] = st.text_area(
                 "Research summary",
                 value=p["research_summary"],
-                height=100,
+                height=110,
                 key="preview_summary",
                 label_visibility="collapsed",
             )
+        else:
+            st.caption("No research summary generated — you can write one in the next section.")
 
         if p["keywords"]:
             st.markdown("**Keywords from your publications:**")
             kw_display = "  ·  ".join(
                 k for k, _ in sorted(p["keywords"].items(), key=lambda x: -x[1])[:12]
             )
-            st.caption(kw_display)
+            st.caption(kw_display + "  _(you can adjust these below)_")
         else:
             st.caption("No keywords found — you can add them manually below.")
 
+        # ── Colleagues ──
+        st.markdown("**Colleagues to track** — papers by these people always appear in your digest:")
         if p.get("au_colleagues"):
-            st.markdown(f"**Colleagues found at {p['institution']}** — uncheck any to exclude:")
+            st.caption(f"Found {len(p['au_colleagues'])} co-authors at {p['institution']} — uncheck any to exclude, or add more below.")
             selected = []
             for colleague in p["au_colleagues"]:
                 checked = st.checkbox(colleague, value=True, key=f"colleague_{colleague}")
                 if checked:
                     selected.append(colleague)
             p["selected_colleagues"] = selected
-        elif p.get("titles"):
-            st.caption("No Aarhus University colleagues found in your co-author list.")
+        else:
+            p["selected_colleagues"] = []
+            if p.get("titles"):
+                st.caption(f"No co-authors with confirmed {p['institution']} affiliation found automatically.")
+
+        # Manual add — always shown so user can add people not found via ORCID
+        extra_col, extra_btn = st.columns([4, 1])
+        with extra_col:
+            extra_colleague = st.text_input(
+                "Add a colleague",
+                placeholder="Jane Smith",
+                key="preview_extra_colleague",
+                label_visibility="collapsed",
+            )
+        with extra_btn:
+            if st.button("Add", key="preview_add_colleague"):
+                name = extra_colleague.strip()
+                if name and name not in p["selected_colleagues"]:
+                    p["selected_colleagues"].append(name)
+                    st.rerun()
 
         if st.button("✓ Looks good — import", type="primary"):
             _commit_preview()
