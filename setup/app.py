@@ -909,6 +909,17 @@ def _has_server_key() -> bool:
     except Exception:
         return False
 
+
+def _server_smtp() -> tuple[str, str]:
+    """Return (smtp_user, smtp_password) from secrets, or ('', '')."""
+    try:
+        return (
+            st.secrets.get("SMTP_USER", ""),
+            st.secrets.get("SMTP_PASSWORD", ""),
+        )
+    except Exception:
+        return "", ""
+
 # Module-level dict: email (lowercased) → unix timestamp of last use.
 # Persists for the lifetime of the Streamlit process (resets on redeploy).
 _DAILY_USAGE: dict[str, float] = {}
@@ -1873,18 +1884,40 @@ you just downloaded. It will replace the example config.
 </div>
 
 <div class="brand-card">
-<p><span class="step-number">3</span> <strong>Add email secrets</strong></p>
+<p><span class="step-number">3</span> <strong>Add secrets to your fork</strong></p>
 <p style="margin-left: 36px;">
-Go to your fork's <strong>Settings → Secrets and variables → Actions</strong> and add:<br>
-<code>RECIPIENT_EMAIL</code> — your email address<br>
-<code>SMTP_USER</code> — your Gmail/Outlook address<br>
-<code>SMTP_PASSWORD</code> — an App Password (<a href="https://myaccount.google.com/apppasswords" style="color: {PINE};">Gmail</a> or <a href="https://account.microsoft.com/security" style="color: {PINE};">Microsoft</a>)<br>
-<em>Optional:</em> <code>ANTHROPIC_API_KEY</code> or <code>GEMINI_API_KEY</code> for AI scoring
+Go to your fork's <strong>Settings → Secrets and variables → Actions</strong> and add the secrets shown below.
 </p>
 </div>
 
 {schedule_note}
 """, unsafe_allow_html=True)
+
+_smtp_user, _smtp_password = _server_smtp()
+_server_gemini = _has_server_key()
+
+if _smtp_user and _smtp_password:
+    # Pre-filled secrets — user only needs to add RECIPIENT_EMAIL
+    st.markdown("**Copy these secrets into your fork** (Settings → Secrets and variables → Actions):")
+    _secrets_block = f"RECIPIENT_EMAIL = your-email@example.com  ← change this\nSMTP_USER      = {_smtp_user}\nSMTP_PASSWORD  = {_smtp_password}"
+    if not _server_gemini:
+        _secrets_block += "\nGEMINI_API_KEY = your-key  ← get free at aistudio.google.com"
+    st.code(_secrets_block, language="ini")
+    st.caption("Emails will be sent from **" + _smtp_user + "**. Change only the `RECIPIENT_EMAIL` line to your own address.")
+else:
+    # No server SMTP — user configures their own
+    st.markdown("**Add these secrets to your fork** (Settings → Secrets and variables → Actions):")
+    st.code(
+        "RECIPIENT_EMAIL = your-email@example.com\n"
+        "SMTP_USER       = your-gmail@gmail.com\n"
+        "SMTP_PASSWORD   = your-app-password  ← not your login password!\n"
+        "GEMINI_API_KEY  = AIza...             ← optional, for AI scoring",
+        language="ini",
+    )
+    st.caption(
+        "Gmail app password: Google Account → Security → 2-Step Verification → "
+        "[App passwords](https://myaccount.google.com/apppasswords)"
+    )
 
 st.success(f"That's it! Your digest will run {schedule_options[schedule].lower()} at {send_hour_utc}:00 UTC. 🎉")
 
