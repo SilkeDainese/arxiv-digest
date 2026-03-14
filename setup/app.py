@@ -6,12 +6,20 @@ Generates a config.yaml (+ workflow snippet) ready to use with the arxiv-digest 
 Created by Silke S. Dainese · dainese@phys.au.dk · silkedainese.github.io
 """
 
+import json
+import os
 import re
 import sys
 from pathlib import Path
 
 import yaml
 import streamlit as st
+
+try:
+    import anthropic as _anthropic_lib
+    _ANTHROPIC_AVAILABLE = True
+except ImportError:
+    _ANTHROPIC_AVAILABLE = False
 
 # Allow imports from the project root (one level up from setup/)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -328,27 +336,19 @@ def suggest_categories(text):
     return sorted(scores, key=scores.get, reverse=True)[:5]
 
 
-def suggest_keywords_from_context(text):
-    """Extract likely research keywords from a research description."""
-    # Split into candidate phrases (2-3 word chunks that look technical)
+def _get_anthropic_key() -> str | None:
+    """Return Anthropic API key from Streamlit secrets or environment, or None."""
+    try:
+        return st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:
+        pass
+    return os.environ.get("ANTHROPIC_API_KEY")
+
+
+def _keyword_regex_fallback(text: str) -> dict[str, int]:
+    """Extract keywords from research description using pattern matching (no API needed)."""
     words = text.split()
-    candidates = {}
-
-    # Single significant words (capitalized terms, acronyms, technical terms)
-    for w in words:
-        clean = re.sub(r"[.,;:!?()\"']", "", w)
-        if not clean or len(clean) < 3:
-            continue
-        # Acronyms (all caps, 2+ chars)
-        if clean.isupper() and len(clean) >= 2 and clean.isalpha():
-            candidates[clean] = 8
-        # Capitalized terms mid-sentence (likely proper nouns / technical terms)
-        elif clean[0].isupper() and not clean.isupper() and len(clean) > 3:
-            candidates[clean.lower()] = 5
-
-    # Bigrams and trigrams
-    clean_words = [re.sub(r"[.,;:!?()\"']", "", w) for w in words]
-    clean_words = [w for w in clean_words if w]
+    candidates: dict[str, int] = {}
     stopwords = {
         "i", "my", "me", "we", "our", "the", "a", "an", "and", "or", "but",
         "in", "on", "at", "to", "for", "of", "with", "by", "from", "as",
@@ -359,6 +359,15 @@ def suggest_keywords_from_context(text):
         "particularly", "specifically", "especially", "including", "focus",
         "work", "study", "research", "currently", "mainly", "primarily",
     }
+    clean_words = [re.sub(r"[.,;:!?()\"']", "", w) for w in words if w]
+
+    for w in clean_words:
+        if not w or len(w) < 3:
+            continue
+        if w.isupper() and len(w) >= 2 and w.isalpha():
+            candidates[w] = 8
+        elif w[0].isupper() and not w.isupper() and len(w) > 3:
+            candidates[w.lower()] = 5
 
     for i in range(len(clean_words) - 1):
         w1, w2 = clean_words[i].lower(), clean_words[i + 1].lower()
@@ -369,15 +378,65 @@ def suggest_keywords_from_context(text):
 
     for i in range(len(clean_words) - 2):
         w1, w2, w3 = clean_words[i].lower(), clean_words[i + 1].lower(), clean_words[i + 2].lower()
-        if w1 not in stopwords and w2 not in stopwords and w3 not in stopwords and len(w1) > 2 and len(w3) > 2:
+        if all(w not in stopwords and len(w) > 2 for w in (w1, w2, w3)):
             trigram = f"{w1} {w2} {w3}"
-            if len(trigram) > 10:  # meaningful length
+            if len(trigram) > 10:
                 candidates[trigram] = 9
 
-    # Filter out very generic terms
     generic = {"et al", "ground based", "non linear"}
     return {k: v for k, v in sorted(candidates.items(), key=lambda x: -x[1])[:15]
             if k.lower() not in generic}
+
+
+def suggest_keywords_from_context(text: str, orcid_keywords: dict | None = None) -> dict[str, int]:
+    """Score research keywords by relevance using Claude if available, regex otherwise.
+
+    When orcid_keywords is provided, Claude re-scores those publication-derived keywords
+    against the research description so that frequency in titles doesn't dominate.
+    """
+    api_key = _get_anthropic_key()
+
+    if not api_key or not _ANTHROPIC_AVAILABLE:
+        return _keyword_regex_fallback(text)
+
+    # Build candidate list: ORCID keywords + regex-derived keywords from description
+    regex_kws = _keyword_regex_fallback(text)
+    all_candidates = dict(regex_kws)
+    if orcid_keywords:
+        all_candidates.update(orcid_keywords)
+
+    candidate_list = "\n".join(f"- {kw}" for kw in all_candidates)
+
+    prompt = (
+        f"A researcher describes their work as:\n\"{text}\"\n\n"
+        f"These are candidate keywords (some from publication titles, some from the description):\n"
+        f"{candidate_list}\n\n"
+        "Score each keyword's relevance to this researcher's specific field on a scale of 1–10. "
+        "Prefer specific technical terms over generic words. Generic words that happen to appear "
+        "in paper titles (like 'water', 'worlds', 'population') should score low unless they are "
+        "genuinely central to this specific research. Return ONLY a JSON object mapping each "
+        "keyword to its integer score. No other text."
+    )
+
+    try:
+        client = _anthropic_lib.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        # Strip markdown code fences if present
+        raw = re.sub(r"^```[a-z]*\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw)
+        scored: dict[str, int] = json.loads(raw)
+        # Keep top 15 by score, clamp to 1-10
+        return dict(sorted(
+            {k: max(1, min(10, int(v))) for k, v in scored.items()}.items(),
+            key=lambda x: -x[1],
+        )[:15])
+    except Exception:
+        return _keyword_regex_fallback(text)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -433,7 +492,7 @@ st.divider()
 #  Section 1: Your Profile
 # ─────────────────────────────────────────────────────────────
 
-st.markdown("## 1. Your Profile")
+st.markdown("## 2. Your Profile")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -474,43 +533,10 @@ st.divider()
 
 
 # ─────────────────────────────────────────────────────────────
-#  Section 2: Research Context
+#  Section 2: Profile Scan (optional)
 # ─────────────────────────────────────────────────────────────
 
-st.markdown("## 2. Your Research")
-
-if ai_assist:
-    st.markdown(
-        "Describe your research in 3-5 sentences, like you'd tell a colleague. "
-        "We'll use this to **suggest arXiv categories and keywords** for you."
-    )
-else:
-    st.markdown("Describe your research in 3-5 sentences. This is what the AI uses to score papers.")
-
-research_context = st.text_area(
-    "Research context",
-    height=120,
-    placeholder="I study exoplanet atmospheres using transmission spectroscopy with JWST and ground-based instruments. I focus on hot Jupiters and sub-Neptunes, particularly their atmospheric composition and cloud properties.",
-    label_visibility="collapsed",
-)
-
-# ── AI suggestions trigger ──
-if ai_assist and research_context and len(research_context) > 30:
-    if st.button("🤖 Suggest categories & keywords from my description", type="primary"):
-        st.session_state.ai_suggested_cats = suggest_categories(research_context)
-        st.session_state.ai_suggested_kws = suggest_keywords_from_context(research_context)
-
-    if st.session_state.ai_suggested_cats:
-        st.success(f"Suggested {len(st.session_state.ai_suggested_cats)} categories and {len(st.session_state.ai_suggested_kws)} keywords — review them below.")
-
-st.divider()
-
-
-# ─────────────────────────────────────────────────────────────
-#  Section 3: Profile Scan (optional)
-# ─────────────────────────────────────────────────────────────
-
-st.markdown("## 3. Profile Scan (optional)")
+st.markdown("## 1. Profile Scan (optional)")
 st.markdown(
     "We can extract keywords from your publication history. "
     "Search by name to find your ORCID profile, then extract keywords in one click. "
@@ -600,7 +626,7 @@ if _confirmed and _is_orcid_url and not st.session_state.pure_scanned:
                 merged = dict(st.session_state.keywords)
                 merged.update(keywords)
                 st.session_state.keywords = merged
-                st.success(f"Found {len(keywords)} keywords from your ORCID publications!")
+                st.success(f"Found {len(keywords)} keywords from your ORCID publications! Continue to step 3 to score them against your research description.")
             st.rerun()
 
 elif _confirmed and _is_orcid_url and st.session_state.pure_scanned:
@@ -644,6 +670,55 @@ elif _confirmed and not st.session_state.pure_scanned:
 
 elif st.session_state.pure_scanned:
     st.success(f"Profile scanned: {st.session_state.pure_confirmed_url}")
+
+st.divider()
+
+
+# ─────────────────────────────────────────────────────────────
+#  Section 3: Research Context
+# ─────────────────────────────────────────────────────────────
+
+st.markdown("## 3. Your Research Description")
+
+if ai_assist:
+    st.markdown(
+        "Describe your research in 3-5 sentences, like you'd tell a colleague. "
+        "We'll use this to **suggest arXiv categories and score keywords** for you."
+    )
+else:
+    st.markdown("Describe your research in 3-5 sentences. This is what the AI uses to score papers.")
+
+research_context = st.text_area(
+    "Research context",
+    height=120,
+    placeholder="I study exoplanet atmospheres using transmission spectroscopy with JWST and ground-based instruments. I focus on hot Jupiters and sub-Neptunes, particularly their atmospheric composition and cloud properties.",
+    label_visibility="collapsed",
+)
+
+# ── AI suggestions trigger ──
+if ai_assist and research_context and len(research_context) > 30:
+    _has_orcid_kws = bool(st.session_state.keywords)
+    _api_available = bool(_get_anthropic_key() and _ANTHROPIC_AVAILABLE)
+    _btn_label = (
+        "🤖 Suggest categories & score keywords with AI"
+        if _api_available
+        else "🤖 Suggest categories & keywords from my description"
+    )
+    if st.button(_btn_label, type="primary"):
+        st.session_state.ai_suggested_cats = suggest_categories(research_context)
+        st.session_state.ai_suggested_kws = suggest_keywords_from_context(
+            research_context,
+            orcid_keywords=st.session_state.keywords if _has_orcid_kws else None,
+        )
+        if _api_available and _has_orcid_kws:
+            # Replace the raw frequency-based ORCID weights with AI-scored ones
+            st.session_state.keywords = {
+                k: v for k, v in st.session_state.ai_suggested_kws.items()
+                if k in st.session_state.keywords
+            }
+
+    if st.session_state.ai_suggested_cats:
+        st.success(f"Suggested {len(st.session_state.ai_suggested_cats)} categories and {len(st.session_state.ai_suggested_kws)} keywords — review them below.")
 
 st.divider()
 
