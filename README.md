@@ -39,8 +39,9 @@ In your fork: **Add file → Upload files** → drag in `config.yaml` → **Comm
 Then add these GitHub Actions secrets:
 
 - `RECIPIENT_EMAIL`
-- If the maintainer gave you an invite code, enter it in the setup wizard and copy the revealed relay / AI secrets
-- Otherwise use your own `SMTP_USER` and `SMTP_PASSWORD`
+- And one email delivery method:
+- Either `DIGEST_RELAY_TOKEN` if the maintainer gave you an invite code and the setup wizard revealed a relay token
+- Or your own `SMTP_USER` and `SMTP_PASSWORD`
 - Optional: `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` for repo-side AI scoring
 
 Then:

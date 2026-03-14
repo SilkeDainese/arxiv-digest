@@ -43,19 +43,24 @@ jobs:
             exit 1
           fi
           echo "✅ recipient_email configured"
-          # SMTP credentials are optional — the relay sends emails by default
+          # Delivery requires either direct SMTP credentials or an explicit relay token.
           SMTP_U="${SMTP_USER:-$GMAIL_USER}"
           SMTP_P="${SMTP_PASSWORD:-$GMAIL_APP_PASSWORD}"
           if [ -n "$SMTP_U" ] && [ -n "$SMTP_P" ]; then
             echo "✅ SMTP credentials found — sending directly"
+          elif [ -n "$DIGEST_RELAY_TOKEN" ]; then
+            echo "✅ Relay token found — sending through shared relay"
           else
-            echo "✅ Using shared email relay (no SMTP secrets needed)"
+            echo "❌ No email delivery method configured."
+            echo "   Add DIGEST_RELAY_TOKEN for relay delivery, or SMTP_USER and SMTP_PASSWORD to send directly."
+            exit 1
           fi
           if [ -n "$ANTHROPIC_API_KEY" ]; then echo "✅ Claude API key found"; fi
           if [ -n "$GEMINI_API_KEY" ]; then echo "✅ Gemini API key found"; fi
-          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then echo "ℹ️  No personal AI key — using shared Gemini key"; fi
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then echo "ℹ️  No AI key configured — using keyword fallback"; fi
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -66,6 +71,7 @@ jobs:
       - name: Run digest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
