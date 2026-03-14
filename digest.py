@@ -141,6 +141,7 @@ def load_config() -> dict[str, Any]:
 
     # ── Environment overrides (env var wins, config.yaml as fallback) ──
     cfg["recipient_email"] = os.environ.get("RECIPIENT_EMAIL", "").strip() or cfg.get("recipient_email", "")
+    cfg["github_repo"] = os.environ.get("GITHUB_REPOSITORY", "").strip() or cfg.get("github_repo", "")
 
     # Backward/typo-safe normalisation for recipient view mode
     mode = str(cfg.get("recipient_view_mode", "deep_read")).strip().lower().replace("-", "_")

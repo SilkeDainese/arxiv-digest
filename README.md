@@ -105,7 +105,7 @@ See [`config.example.yaml`](config.example.yaml) for all options with inline com
 | `colleagues` | People/institutions whose papers always show; people can carry an optional `note` shown in the digest |
 | `digest_mode` | `highlights` (fewer, higher-quality picks) or `in_depth` (wider net, more papers) |
 | `recipient_view_mode` | `deep_read` (full cards) or `5_min_skim` (top 3 one-line summaries) |
-| `github_repo` | Your fork's path, e.g. `janedoe/arxiv-digest` — enables self-service links and feedback arrows |
+| `github_repo` | Your fork's path, e.g. `janedoe/arxiv-digest` — enables self-service links and feedback arrows. On GitHub Actions the current repo is auto-detected, so renamed forks keep working |
 
 ---
 

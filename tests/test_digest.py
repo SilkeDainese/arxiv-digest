@@ -239,6 +239,22 @@ class TestLoadConfig:
                 cfg = d.load_config()
         assert cfg["recipient_email"] == "test@example.com"
 
+    def test_github_repo_env_override(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "keywords": {"stellar rotation": 8},
+                    "recipient_email": "test@example.com",
+                    "github_repo": "old-name/arxiv-digest",
+                }
+            )
+        )
+        with patch.object(d, "CONFIG_PATH", config_file):
+            with patch.dict(os.environ, {"GITHUB_REPOSITORY": "new-name/renamed-digest"}):
+                cfg = d.load_config()
+        assert cfg["github_repo"] == "new-name/renamed-digest"
+
     def test_colleagues_dict_gets_defaults(self, tmp_path):
         """A colleagues dict missing the 'institutions' key gets it defaulted."""
         config_file = tmp_path / "config.yaml"

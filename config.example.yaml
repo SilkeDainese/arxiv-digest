@@ -111,5 +111,6 @@ smtp_port: 587
 # own_api_key: true   # set to true once you add your own GEMINI_API_KEY or ANTHROPIC_API_KEY
 
 # ── Your Repository ───────────────────────────
-# Used for self-service links in emails (edit config, pause digest)
+# Used for self-service links in emails (edit config, pause digest).
+# GitHub Actions auto-detects the current repo, so this mainly matters for local previews/manual runs.
 github_repo: ""          # Your fork's path, e.g. "janedoe/arxiv-digest" — enables self-service links in emails
