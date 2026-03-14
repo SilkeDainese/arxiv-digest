@@ -653,7 +653,7 @@ def render_mini_setup() -> None:
 <div class="brand-card">
 <p><span class="step-number">1</span> <strong>Fork the template repo</strong></p>
 <p style="margin-left: 36px;">
-Fork <a href="https://github.com/SilkeDainese/arxiv-silke" target="_blank">SilkeDainese/arxiv-silke</a>.
+Fork <a href="https://github.com/SilkeDainese/arxiv-digest" target="_blank">SilkeDainese/arxiv-digest</a>.
 </p>
 
 <p><span class="step-number">2</span> <strong>Upload your config.yaml</strong></p>

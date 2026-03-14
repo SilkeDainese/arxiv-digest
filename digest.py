@@ -10,6 +10,7 @@ Created by Silke S. Dainese · dainese@phys.au.dk · silkedainese.github.io
 """
 from __future__ import annotations
 
+import html as html_mod
 import os
 import json
 import re
@@ -72,6 +73,11 @@ def load_config() -> dict[str, Any]:
     cfg.setdefault("github_repo", "")
     cfg.setdefault("smtp_server", "smtp.gmail.com")
     cfg.setdefault("smtp_port", 587)
+    try:
+        cfg["smtp_port"] = int(cfg["smtp_port"])
+    except (TypeError, ValueError):
+        print(f"  ⚠️  Invalid smtp_port '{cfg['smtp_port']}' — defaulting to 587")
+        cfg["smtp_port"] = 587
     cfg.setdefault("digest_mode", "highlights")  # "highlights" or "in_depth"
     cfg.setdefault("recipient_view_mode", "deep_read")  # "deep_read" or "5_min_skim"
     cfg.setdefault("self_match", [])  # patterns to match YOUR name in author lists
@@ -497,7 +503,11 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
             print(f"  Error: {e}")
             continue
 
-        root = ET.fromstring(xml_data)
+        try:
+            root = ET.fromstring(xml_data)
+        except ET.ParseError as exc:
+            print(f"  ⚠️  Failed to parse arXiv XML for {category}: {exc}")
+            continue
         ns = {"atom": "http://www.w3.org/2005/Atom"}
         cutoff = datetime.utcnow() - timedelta(days=config["days_back"])
 
@@ -766,6 +776,7 @@ def _analyse_with_gemini(papers: list[dict[str, Any]], config: dict[str, Any], a
     client = genai.Client(api_key=api_key)
     analysed = []
     rate_limit_failures = 0
+    consecutive_failures = 0
 
     for i, paper in enumerate(papers):
         print(f"  Analysing {i+1}/{len(papers)} (Gemini): {paper['title'][:60]}...")
@@ -790,15 +801,17 @@ def _analyse_with_gemini(papers: list[dict[str, Any]], config: dict[str, Any], a
             paper.update(analysis)
             analysed.append(paper)
             rate_limit_failures = 0
+            consecutive_failures = 0
             print(f"    → score: {analysis.get('relevance_score', '?')}")
         except Exception as e:
             error_str = str(e)
             lower = error_str.lower()
             print(f"    Error: {error_str}")
+            consecutive_failures += 1
 
             is_rate_limit = (
                 "429" in lower
-                or "rate" in lower and "limit" in lower
+                or ("rate" in lower and "limit" in lower)
                 or "quota" in lower
                 or "resource_exhausted" in lower
                 or "resource exhausted" in lower
@@ -824,6 +837,7 @@ def _analyse_with_gemini(papers: list[dict[str, Any]], config: dict[str, Any], a
                     paper.update(analysis)
                     analysed.append(paper)
                     rate_limit_failures = 0
+                    consecutive_failures = 0
                     print(f"    → score: {analysis.get('relevance_score', '?')} (after retry)")
                     continue
                 except Exception as retry_e:
@@ -838,6 +852,10 @@ def _analyse_with_gemini(papers: list[dict[str, Any]], config: dict[str, Any], a
 
             paper.update(_default_analysis(paper))
             analysed.append(paper)
+
+            if consecutive_failures >= 3:
+                print("  ⚠️  3 consecutive Gemini failures — switching to fallback...")
+                return None, "gemini_errors"
 
     return _filter_and_sort(analysed, config), None
 
@@ -938,6 +956,11 @@ from brand import (PINE, GOLD, UMBER, ASH_WHITE, ASH_BLACK,
 _TAG = f"font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:3px;display:inline-block;margin:2px 3px 2px 0;color:{WARM_GREY}"
 
 
+def _esc(text: Any) -> str:
+    """HTML-escape a value for safe interpolation into email HTML."""
+    return html_mod.escape(str(text)) if text else ""
+
+
 def _score_bar(score: int | float) -> str:
     """Return a 10-dot bar visualising the relevance score."""
     filled = round(score)
@@ -968,19 +991,19 @@ def _build_tags(p: dict[str, Any]) -> str:
     elif score >= 8:
         tags.append(f'<span style="{_TAG};background:#FFF8E1;color:{UMBER}">&#x1F4CC; thesis</span>')
     for kw in (p.get("kw_tags") or [])[:2]:
-        tags.append(f'<span style="{_TAG};background:{PINE_WASH};color:{PINE}">{kw}</span>')
+        tags.append(f'<span style="{_TAG};background:{PINE_WASH};color:{PINE}">{_esc(kw)}</span>')
     if p.get("is_new_catalog"):
         tags.append(f'<span style="{_TAG};background:#F3E8FF;color:#6B21A8">&#x1F4E6; catalog</span>')
     if p.get("cite_worthy"):
         tags.append(f'<span style="{_TAG};background:{PINE_WASH};color:{PINE}">&#x1F4CE; cite this</span>')
     if p.get("new_result"):
-        tags.append(f'<span style="{_TAG};background:{PINE_WASH};color:{PINE}">{p["new_result"]}</span>')
+        tags.append(f'<span style="{_TAG};background:{PINE_WASH};color:{PINE}">{_esc(p["new_result"])}</span>')
     return " ".join(tags)
 
 
 def _build_method_tags(p: dict[str, Any]) -> str:
     """Build inline HTML method tag spans for a paper card."""
-    return " ".join(f'<span style="{_TAG};background:#FFF8E1;color:{UMBER}">{t}</span>' for t in (p.get("method_tags") or []))
+    return " ".join(f'<span style="{_TAG};background:#FFF8E1;color:{UMBER}">{_esc(t)}</span>' for t in (p.get("method_tags") or []))
 
 
 def _one_sentence(text: str) -> str:
@@ -1053,9 +1076,9 @@ def _render_own_paper_section(own_papers: list[dict[str, Any]], researcher_name:
           <tr><td style="background:linear-gradient(135deg, {PINE_WASH}, #FFF8E1);border:2px solid {GOLD};border-radius:8px;padding:20px 22px">
             <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:{PINE};margin-bottom:8px">&#x1F389; Congratulations, {researcher_name}!</div>
             <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;color:{ASH_BLACK};line-height:1.4;margin-bottom:6px">
-              <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{p['title']}</a>
+              <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(p['title'])}</a>
             </div>
-            <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:10px">{authors_short}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:10px">{_esc(authors_short)}</div>
             <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};font-style:italic">Your paper appeared on arXiv! &#x1F31F;</div>
           </td></tr>
         </table>"""
@@ -1085,9 +1108,9 @@ def _render_colleague_section(colleague_papers: list[dict[str, Any]]) -> str:
         details = p.get("colleague_details") or [
             {"name": name} for name in dict.fromkeys(p.get("colleague_matches", []))
         ]
-        names = ", ".join(detail["name"] for detail in details if detail.get("name"))
+        names = _esc(", ".join(detail["name"] for detail in details if detail.get("name")))
         notes = [
-            f"{detail['name']} — {detail['note']}"
+            f"{_esc(detail['name'])} — {_esc(detail['note'])}"
             for detail in details
             if detail.get("name") and detail.get("note")
         ]
@@ -1105,9 +1128,9 @@ def _render_colleague_section(colleague_papers: list[dict[str, Any]]) -> str:
           <tr><td style="background:#FFF8E1;border:1px solid {GOLD_LIGHT};border-radius:6px;padding:14px 16px">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:{UMBER};margin-bottom:6px">&#x1F389; {names}</div>
             <div style="font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:{ASH_BLACK};line-height:1.4;margin-bottom:4px">
-              <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{p['title'][:80]}{'...' if len(p['title']) > 80 else ''}</a>
+              <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(p['title'][:80])}{'...' if len(p['title']) > 80 else ''}</a>
             </div>
-            <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY}">{authors_short}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY}">{_esc(authors_short)}</div>
             {notes_html}
           </td></tr>
         </table>"""
@@ -1137,8 +1160,10 @@ def _render_paper_card(p: dict[str, Any], is_top_pick: bool, total_papers: int, 
                         f'display:inline-block;border-radius:3px;margin-bottom:8px">&#x2B51; Top pick</span>'
                 )
 
-        what_changed = _one_sentence(p.get("plain_summary", ""))
+        what_changed = _esc(_one_sentence(p.get("plain_summary", "")))
         feedback_links = _build_feedback_links(p, github_repo)
+        emoji = _esc(p.get('emoji', '')) or '&#x1F52D;'
+        why = _esc(p.get('why_interesting', ''))
 
         return f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px">
@@ -1148,19 +1173,19 @@ def _render_paper_card(p: dict[str, Any], is_top_pick: bool, total_papers: int, 
                     <tr>
                         <td style="vertical-align:top;padding-bottom:8px">{_build_tags(p)}</td>
                         <td width="78" style="vertical-align:top;text-align:right;padding-bottom:8px">
-                            <span style="font-size:22px;line-height:1">{p.get('emoji','&#x1F52D;')}</span><br>
+                            <span style="font-size:22px;line-height:1">{emoji}</span><br>
                             <span style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:{ac};line-height:1">{score}</span><span style="font-size:12px;color:{WARM_GREY}">/10</span><br>
                             <span style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:{ac};opacity:0.55">{_score_bar(score)}</span>
                         </td>
                     </tr>
                 </table>
-                <div style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;color:{ASH_BLACK};line-height:1.35;margin-bottom:4px"><a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_short_title(p['title'])}</a></div>
-                <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:8px">{authors_display}</div>
+                <div style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;color:{ASH_BLACK};line-height:1.35;margin-bottom:4px"><a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(_short_title(p['title']))}</a></div>
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:8px">{_esc(authors_display)}</div>
                 <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{ASH_BLACK};line-height:1.55;margin:0 0 10px"><strong>What changed:</strong> {what_changed}</div>
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px">
                     <tr><td style="background:#FFF8E1;border:1px solid {GOLD_LIGHT};border-radius:5px;padding:10px 12px">
                         <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:{WARM_GREY};margin-bottom:6px">&#x2B50; Why it matters to you</div>
-                        <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};line-height:1.65">{p.get('why_interesting','')}</div>
+                        <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};line-height:1.65">{why}</div>
                     </td></tr>
                 </table>
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -1175,7 +1200,7 @@ def _render_skim_card(p: dict[str, Any], github_repo: str) -> str:
         """Return the compact 5-minute skim card (one-line summary)."""
         score = p.get("relevance_score", 5)
         ac = _accent_color(score)
-        summary = _one_sentence(p.get("plain_summary", ""))
+        summary = _esc(_one_sentence(p.get("plain_summary", "")))
         feedback_links = _build_feedback_links(p, github_repo)
 
         return f"""
@@ -1183,7 +1208,7 @@ def _render_skim_card(p: dict[str, Any], github_repo: str) -> str:
             <tr><td style="background:white;border:1px solid {CARD_BORDER};border-left:4px solid {ac};border-radius:7px;padding:12px 14px">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
                     <div style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;line-height:1.35;color:{ASH_BLACK}">
-                        <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_short_title(p['title'], 90)}</a>
+                        <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(_short_title(p['title'], 90))}</a>
                     </div>
                     <div style="font-family:'DM Mono',monospace;font-size:10px;color:{ac};white-space:nowrap">{score}/10</div>
                 </div>

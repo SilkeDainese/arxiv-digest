@@ -44,7 +44,7 @@ _BROWSER_HEADERS = {
 
 _ORCID_HEADERS = {
     "Accept": "application/json",
-    "User-Agent": "arxiv-digest-setup/1.0 (https://github.com/SilkeDainese/arxiv-silke)",
+    "User-Agent": "arxiv-digest-setup/1.0 (https://github.com/SilkeDainese/arxiv-digest)",
 }
 
 # Words to exclude from keyword extraction

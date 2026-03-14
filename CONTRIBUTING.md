@@ -14,8 +14,8 @@ Open an issue before writing code. Describe what you want to change and why. Thi
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/arxiv-silke.git
-cd arxiv-silke
+git clone https://github.com/YOUR_USERNAME/arxiv-digest.git
+cd arxiv-digest
 
 # Install dependencies
 pip install -r requirements.txt
