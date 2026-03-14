@@ -1,4 +1,4 @@
-name: Science News for Silke 🔭
+name: arXiv Digest
 
 on:
   schedule:
@@ -19,25 +19,44 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install anthropic pyyaml
+        run: pip install -r requirements.txt
 
-      - name: Check secrets are set
+      - name: Check required secrets
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "❌ ANTHROPIC_API_KEY is not set!"; exit 1; fi
           if [ -z "$RECIPIENT_EMAIL" ]; then echo "❌ RECIPIENT_EMAIL is not set!"; exit 1; fi
-          if [ -z "$GMAIL_USER" ]; then echo "❌ GMAIL_USER is not set!"; exit 1; fi
-          if [ -z "$GMAIL_APP_PASSWORD" ]; then echo "❌ GMAIL_APP_PASSWORD is not set!"; exit 1; fi
-          echo "✅ All secrets present"
+          # SMTP credentials: support both new (SMTP_*) and legacy (GMAIL_*) names
+          SMTP_U="${SMTP_USER:-$GMAIL_USER}"
+          SMTP_P="${SMTP_PASSWORD:-$GMAIL_APP_PASSWORD}"
+          if [ -z "$SMTP_U" ]; then echo "❌ SMTP_USER (or GMAIL_USER) is not set!"; exit 1; fi
+          if [ -z "$SMTP_P" ]; then echo "❌ SMTP_PASSWORD (or GMAIL_APP_PASSWORD) is not set!"; exit 1; fi
+          # Validate smtp_server from config.yaml (basic hostname check)
+          SMTP_HOST=$(python -c "import yaml; c=yaml.safe_load(open('config.yaml')); print(c.get('smtp_server','smtp.gmail.com'))" 2>/dev/null || echo "smtp.gmail.com")
+          if ! echo "$SMTP_HOST" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$'; then
+            echo "⚠️  smtp_server '$SMTP_HOST' looks invalid — check config.yaml"
+          else
+            echo "✅ SMTP server: $SMTP_HOST"
+          fi
+          # AI keys are optional — digest falls back to keyword-only scoring
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "✅ Claude API key found"; fi
+          if [ -n "$GEMINI_API_KEY" ]; then echo "✅ Gemini API key found"; fi
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then echo "⚠️  No AI API key — using keyword-only scoring"; fi
+          echo "✅ Required secrets present"
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       - name: Run digest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python digest.py
@@ -49,6 +68,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add keyword_stats.json || true
           git diff --cached --quiet || git commit -m "📊 Update keyword stats [skip ci]"
+          git pull --rebase || true
           git push || true
 
       - name: Upload digest as artifact
