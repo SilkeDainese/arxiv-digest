@@ -954,6 +954,52 @@ class TestEmailSending:
         assert send_args[1] == ["a@example.com", "b@example.com"]
         assert "To: a@example.com, b@example.com" in send_args[2]
 
+    def test_send_via_relay_requires_explicit_token(self, capsys):
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("digest.urllib.request.urlopen") as urlopen:
+                ok = d._send_via_relay(
+                    ["a@example.com"],
+                    "Test subject",
+                    "<p>hi</p>",
+                    "hi",
+                )
+
+        assert ok is False
+        urlopen.assert_not_called()
+        assert "DIGEST_RELAY_TOKEN is not configured" in capsys.readouterr().out
+
+    def test_send_via_relay_uses_configured_token(self):
+        class _FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps({"ok": True}).encode("utf-8")
+
+        def fake_urlopen(req, timeout=30):
+            payload = json.loads(req.data.decode("utf-8"))
+            assert payload["token"] == "secret-token"
+            assert payload["recipients"] == ["a@example.com"]
+            assert payload["subject"] == "Test subject"
+            assert payload["html"] == "<p>hi</p>"
+            assert payload["plain_text"] == "hi"
+            assert timeout == 30
+            return _FakeResponse()
+
+        with patch.dict(os.environ, {"DIGEST_RELAY_TOKEN": "secret-token"}, clear=True):
+            with patch("digest.urllib.request.urlopen", side_effect=fake_urlopen):
+                ok = d._send_via_relay(
+                    ["a@example.com"],
+                    "Test subject",
+                    "<p>hi</p>",
+                    "hi",
+                )
+
+        assert ok is True
+
 
 # ─────────────────────────────────────────────────────────────
 #  analyse_papers — cascade logic (no real API calls)

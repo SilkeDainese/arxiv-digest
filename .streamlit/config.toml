@@ -1,5 +1,5 @@
-# Brand colors for local `streamlit run app.py` launches from setup/.
-# Keep this file in sync with ../.streamlit/config.toml and brand.py.
+# Brand colors for Streamlit Cloud and repo-root launches.
+# Keep this file in sync with setup/.streamlit/config.toml and brand.py.
 [theme]
 primaryColor = "#2F4F3E"
 backgroundColor = "#F6F5F2"

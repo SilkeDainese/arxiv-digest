@@ -7,6 +7,7 @@ Created by Silke S. Dainese · dainese@phys.au.dk · silkedainese.github.io
 """
 
 import json
+import hmac
 import os
 import re
 import sys
@@ -493,7 +494,8 @@ you just downloaded.
 
 <p><span class="step-number">3</span> <strong>Add secrets</strong></p>
 <p style="margin-left: 36px;">
-Add <code>RECIPIENT_EMAIL</code>, <code>SMTP_USER</code>, and <code>SMTP_PASSWORD</code> in your fork’s
+Add <code>RECIPIENT_EMAIL</code> plus either <code>DIGEST_RELAY_TOKEN</code> or your own
+<code>SMTP_USER</code> and <code>SMTP_PASSWORD</code> in your fork’s
 <strong>Settings → Secrets and variables → Actions</strong>.
 </p>
 
@@ -734,31 +736,29 @@ def _summarise_research(titles: list[str]) -> str:
 
 
 def _get_gemini_key() -> str | None:
-    """Return Gemini API key: session state → secrets → env → None."""
+    """Return Gemini API key: user-provided → invite-unlocked shared key → None."""
     user_key = st.session_state.get("user_gemini_key", "").strip()
     if user_key:
         return user_key
-    try:
-        key = st.secrets.get("GEMINI_API_KEY")
-        if key:
-            return key
-    except Exception:
-        pass
-    return os.environ.get("GEMINI_API_KEY")
+
+    invite_bundle = st.session_state.get("_invite_bundle", {})
+    invite_key = str(invite_bundle.get("gemini_api_key", "")).strip()
+    if invite_key:
+        return invite_key
+    return None
 
 
 def _get_anthropic_key() -> str | None:
-    """Return Anthropic API key: session state → secrets → env → None."""
+    """Return Anthropic API key: user-provided → invite-unlocked shared key → None."""
     user_key = st.session_state.get("user_anthropic_key", "").strip()
     if user_key:
         return user_key
-    try:
-        key = st.secrets.get("ANTHROPIC_API_KEY")
-        if key:
-            return key
-    except Exception:
-        pass
-    return os.environ.get("ANTHROPIC_API_KEY")
+
+    invite_bundle = st.session_state.get("_invite_bundle", {})
+    invite_key = str(invite_bundle.get("anthropic_api_key", "")).strip()
+    if invite_key:
+        return invite_key
+    return None
 
 
 def _ai_available() -> bool:
@@ -1085,22 +1085,83 @@ def _import_profile(result: dict) -> None:
 
 
 def _has_server_key() -> bool:
-    """True if a Gemini key is baked into Streamlit secrets (server-side)."""
-    try:
-        return bool(st.secrets.get("GEMINI_API_KEY"))
-    except Exception:
-        return False
+    """True if the current invite code unlocked shared AI credentials."""
+    invite_bundle = st.session_state.get("_invite_bundle", {})
+    return bool(
+        str(invite_bundle.get("gemini_api_key", "")).strip()
+        or str(invite_bundle.get("anthropic_api_key", "")).strip()
+    )
 
 
-def _server_smtp() -> tuple[str, str]:
-    """Return (smtp_user, smtp_password) from secrets, or ('', '')."""
+def _normalise_invite_bundles(raw: object) -> dict[str, dict[str, str]]:
+    """Return invite-code bundles in a consistent {code: secrets} shape."""
+    if not isinstance(raw, dict):
+        return {}
+
+    bundles: dict[str, dict[str, str]] = {}
+    for code, payload in raw.items():
+        clean_code = str(code).strip()
+        if not clean_code:
+            continue
+
+        if isinstance(payload, str):
+            token = payload.strip()
+            if token:
+                bundles[clean_code] = {"relay_token": token}
+            continue
+
+        if not isinstance(payload, dict):
+            continue
+
+        relay_token = str(
+            payload.get("relay_token") or payload.get("digest_relay_token") or ""
+        ).strip()
+        gemini_key = str(payload.get("gemini_api_key") or "").strip()
+        anthropic_key = str(payload.get("anthropic_api_key") or "").strip()
+
+        secrets_bundle = {
+            key: value
+            for key, value in {
+                "relay_token": relay_token,
+                "gemini_api_key": gemini_key,
+                "anthropic_api_key": anthropic_key,
+            }.items()
+            if value
+        }
+        if secrets_bundle:
+            bundles[clean_code] = secrets_bundle
+
+    return bundles
+
+
+def _get_invite_bundle(code: str) -> dict[str, str]:
+    """Look up an invite code from Streamlit secrets and return its secret bundle."""
+    invite_code = code.strip()
+    if not invite_code:
+        return {}
+
+    raw_sources: list[object] = []
     try:
-        return (
-            st.secrets.get("SMTP_USER", ""),
-            st.secrets.get("SMTP_PASSWORD", ""),
-        )
+        json_blob = st.secrets.get("INVITE_CODES_JSON")
+        if json_blob:
+            raw_sources.append(json.loads(json_blob))
     except Exception:
-        return "", ""
+        pass
+
+    for key in ("invite_codes", "INVITE_CODES"):
+        try:
+            raw_sources.append(st.secrets.get(key))
+        except Exception:
+            pass
+
+    bundles: dict[str, dict[str, str]] = {}
+    for raw in raw_sources:
+        bundles.update(_normalise_invite_bundles(raw))
+
+    for candidate_code, bundle in bundles.items():
+        if hmac.compare_digest(invite_code, candidate_code.strip()):
+            return bundle
+    return {}
 
 
 # Module-level dict: email (lowercased) → unix timestamp of last use.
@@ -1165,6 +1226,8 @@ if "_orcid_coauthor_counts" not in st.session_state:
     st.session_state["_orcid_coauthor_counts"] = {}
 if "group_orcid_members" not in st.session_state:
     st.session_state.group_orcid_members = []
+if "_invite_bundle" not in st.session_state:
+    st.session_state["_invite_bundle"] = {}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1207,7 +1270,35 @@ if setup_mode == "mini_no_orcid":
     render_mini_setup()
     st.stop()
 
-# ── AI setup — server key (no user key needed) or bring-your-own ──
+# ── Invite code (optional) ──
+st.markdown("### Invite code")
+invite_code = st.text_input(
+    "Invite code (optional)",
+    key="invite_code_input",
+    type="password",
+    placeholder="Only if Silke gave you one",
+    help="Unlocks shared relay / AI access for invited users.",
+)
+invite_bundle = _get_invite_bundle(invite_code)
+st.session_state["_invite_bundle"] = invite_bundle
+if invite_code.strip():
+    if invite_bundle:
+        unlocked = []
+        if invite_bundle.get("relay_token"):
+            unlocked.append("relay")
+        if invite_bundle.get("gemini_api_key") or _has_server_key():
+            unlocked.append("Gemini")
+        if invite_bundle.get("anthropic_api_key"):
+            unlocked.append("Anthropic")
+        st.success(
+            "Invite code accepted — shared "
+            + ", ".join(unlocked)
+            + " access is enabled for this session."
+        )
+    else:
+        st.warning("Invite code not recognised.")
+
+# ── AI setup — invite-unlocked shared key or bring-your-own ──
 if _has_server_key():
     # Server has a key — just ask for email for rate limiting
     st.markdown("## Get started")
@@ -2905,45 +2996,61 @@ Go to your fork's <strong>Settings → Secrets and variables → Actions</strong
     unsafe_allow_html=True,
 )
 
-_smtp_user, _smtp_password = _server_smtp()
 _server_gemini = _has_server_key()
+_invite_bundle = st.session_state.get("_invite_bundle", {})
 
-if _smtp_user and _smtp_password:
-    # Pre-filled secrets — user only needs to add RECIPIENT_EMAIL
-    st.markdown(
-        "**Copy these secrets into your fork** (Settings → Secrets and variables → Actions):"
-    )
-    _secrets_block = (
-        "RECIPIENT_EMAIL = your-email@example.com  ← one address or comma-separated list\n"
-        f"SMTP_USER      = {_smtp_user}\n"
-        f"SMTP_PASSWORD  = {_smtp_password}"
-    )
-    if not _server_gemini:
-        _secrets_block += (
-            "\nGEMINI_API_KEY = your-key  ← get free at aistudio.google.com"
+st.markdown(
+    "**Add these secrets to your fork** (Settings → Secrets and variables → Actions):"
+)
+if _invite_bundle:
+    st.markdown("**Easy mode — your invite code unlocked shared secrets**")
+    _shared_secret_lines = [
+        "RECIPIENT_EMAIL    = your-email@example.com  ← or alice@example.com, bob@example.com"
+    ]
+    if _invite_bundle.get("relay_token"):
+        _shared_secret_lines.append(
+            f"DIGEST_RELAY_TOKEN = {_invite_bundle['relay_token']}"
         )
-    st.code(_secrets_block, language="ini")
+    if _invite_bundle.get("gemini_api_key"):
+        _shared_secret_lines.append(
+            f"GEMINI_API_KEY    = {_invite_bundle['gemini_api_key']}"
+        )
+    if _invite_bundle.get("anthropic_api_key"):
+        _shared_secret_lines.append(
+            f"ANTHROPIC_API_KEY = {_invite_bundle['anthropic_api_key']}"
+        )
+    st.code("\n".join(_shared_secret_lines), language="ini")
     st.caption(
-        "Emails will be sent from **"
-        + _smtp_user
-        + "**. Change only the `RECIPIENT_EMAIL` line to your own address, or use a comma-separated list for a group."
+        "Paste these into your fork's GitHub Actions secrets. Do not commit them to the repo."
     )
 else:
-    # No server SMTP — user configures their own
-    st.markdown(
-        "**Add these secrets to your fork** (Settings → Secrets and variables → Actions):"
+    st.markdown("**Option A — maintainer-managed relay**")
+    st.code(
+        "RECIPIENT_EMAIL    = your-email@example.com  ← or alice@example.com, bob@example.com\n"
+        "DIGEST_RELAY_TOKEN = paste-token-here        ← only if the maintainer gave you one",
+        language="ini",
     )
+    st.caption("Use this option only if you were given a private relay token.")
+
+    st.markdown("**Option B — send from your own mailbox**")
     st.code(
         "RECIPIENT_EMAIL = your-email@example.com  ← or alice@example.com, bob@example.com\n"
         "SMTP_USER       = your-gmail@gmail.com\n"
-        "SMTP_PASSWORD   = your-app-password  ← not your login password!\n"
-        "GEMINI_API_KEY  = AIza...             ← optional, for AI scoring",
+        "SMTP_PASSWORD   = your-app-password  ← Gmail App Password, not your login password",
         language="ini",
     )
     st.caption(
         "Gmail app password: Google Account → Security → 2-Step Verification → "
         "[App passwords](https://myaccount.google.com/apppasswords)"
     )
+
+    if not _server_gemini:
+        st.markdown("**Optional AI key for better scoring**")
+        st.code(
+            "GEMINI_API_KEY    = AIza...      ← free at aistudio.google.com\n"
+            "ANTHROPIC_API_KEY = sk-ant-...   ← optional alternative",
+            language="ini",
+        )
 
 st.success(
     f"That's it! Your digest will run {schedule_options.get(schedule, schedule).lower()} at {send_hour_utc}:00 UTC. 🎉"

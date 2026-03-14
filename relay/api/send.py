@@ -86,15 +86,7 @@ class handler(BaseHTTPRequestHandler):
             self._respond(500, {"error": str(e)})
 
     def do_GET(self):
-        debug = {
-            "status": "arXiv Digest relay is running",
-            "smtp_user_len": len(SMTP_USER),
-            "smtp_user_repr": repr(SMTP_USER),
-            "smtp_pass_len": len(SMTP_PASSWORD),
-            "relay_token_repr": repr(RELAY_TOKEN),
-            "python": os.sys.version,
-        }
-        self._respond(200, debug)
+        self._respond(200, {"status": "arXiv Digest relay is running"})
 
     def _respond(self, status: int, body: dict):
         payload = json.dumps(body).encode("utf-8")

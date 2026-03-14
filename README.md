@@ -16,7 +16,7 @@ If you have suggestions, open an issue or [email me](mailto:dainese@phys.au.dk).
 
 ## Quick Start
 
-Three steps. No API keys, no passwords, no terminal.
+Three steps plus one email-delivery secret. No terminal.
 
 ### 1. Generate your config
 
@@ -32,9 +32,16 @@ Fill in your name, research description, keywords, and the email address where y
 
 This creates your own copy. Everything runs in your fork — nothing is shared back.
 
-### 3. Upload your config and run
+### 3. Upload your config, add secrets, and run
 
 In your fork: **Add file → Upload files** → drag in `config.yaml` → **Commit changes**.
+
+Then add these GitHub Actions secrets:
+
+- `RECIPIENT_EMAIL`
+- If the maintainer gave you an invite code, enter it in the setup wizard and copy the revealed relay / AI secrets
+- Otherwise use your own `SMTP_USER` and `SMTP_PASSWORD`
+- Optional: `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` for repo-side AI scoring
 
 Then:
 
@@ -49,25 +56,25 @@ Your first digest email should arrive within a few minutes. If something goes wr
 
 ## Optional Upgrades
 
-None of these are required. Everything works without them.
+Some extras are optional; email delivery is not.
 
 | Upgrade | What it does | How to set it up |
 |---------|--------------|------------------|
 | **Your own AI key** | Faster, more reliable scoring | Add `GEMINI_API_KEY` ([free →](https://aistudio.google.com/apikey)) or `ANTHROPIC_API_KEY` ([→](https://console.anthropic.com/)) as a [repo secret](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions). Set `own_api_key: true` in config.yaml |
 | **Feedback arrows** | ↑/↓ buttons on each paper to improve future scoring | Set `github_repo: "yourusername/arxiv-digest"` in config.yaml |
 | **Keyword tracking** | Track which keywords match papers over time | **Settings → Actions → General → Workflow permissions** → "Read and write" |
-| **Own email sender** | Send from your own Gmail/Outlook instead of the shared sender | Add `SMTP_USER` and `SMTP_PASSWORD` as [repo secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions) ([Gmail App Password →](https://myaccount.google.com/apppasswords)) |
+| **Own email sender** | Send from your own Gmail/Outlook instead of using a maintainer-provided relay token | Add `SMTP_USER` and `SMTP_PASSWORD` as [repo secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions) ([Gmail App Password →](https://myaccount.google.com/apppasswords)) |
 
 ---
 
 ## How It Works
 
-Your fork comes with a shared Gemini API key and a shared email relay, so everything works from the first run. The digest automatically uses the best AI available and falls back gracefully:
+If the maintainer gave you an invite code, the setup wizard can unlock shared relay / AI access for your session. Otherwise, the digest in your fork uses the best AI available from your own repo secrets and falls back gracefully:
 
 | Tier | Provider | Quality | What happens |
 |------|----------|---------|--------------|
 | 1 | **Claude** (Anthropic) | Best | Used if you add an `ANTHROPIC_API_KEY` |
-| 2 | **Gemini 2.0 Flash** (Google) | Good | Used by default (shared key included) |
+| 2 | **Gemini 2.0 Flash** (Google) | Good | Used if you add a `GEMINI_API_KEY` |
 | 3 | **Keyword fallback** | Basic | Automatic fallback if AI is unavailable |
 
 If one tier fails, it cascades to the next. You always get a digest. No money goes to the creator of this tool — API costs go directly to Anthropic/Google.
@@ -124,9 +131,40 @@ These create labeled GitHub issues (`digest-feedback`) that are automatically in
 
 ## Email Setup
 
-**You don't need to configure anything.** Emails are sent from `arxivdigestau@gmail.com` via a shared relay — it just works.
+Pick one safe email setup:
 
-If you prefer to send from your own email instead, see the **Own email sender** row in [Optional Upgrades](#optional-upgrades). Gmail users need an [App Password](https://myaccount.google.com/apppasswords); Outlook users should also set `smtp_server: "smtp.office365.com"` in their `config.yaml`.
+1. If the maintainer gave you an invite code, enter it in the setup wizard and copy the revealed secrets into your repo.
+2. Or add `SMTP_USER` and `SMTP_PASSWORD` to send from your own mailbox.
+
+Gmail users need an [App Password](https://myaccount.google.com/apppasswords); Outlook users should also set `smtp_server: "smtp.office365.com"` in their `config.yaml`.
+
+### Invite Codes For Maintainers
+
+The setup wizard can unlock different shared secrets per invite code. Configure those codes in the Streamlit app secrets.
+
+Example `secrets.toml` / Streamlit Cloud secrets:
+
+```toml
+[invite_codes."friend-easy"]
+relay_token = "relay-token-for-trusted-people"
+gemini_api_key = "AIza..."
+
+[invite_codes."claude-friend"]
+relay_token = "relay-token-for-trusted-people"
+anthropic_api_key = "sk-ant-..."
+
+[invite_codes."mail-only"]
+relay_token = "relay-token-for-trusted-people"
+```
+
+Leave a key out if that code should not get it. For example:
+
+- include `relay_token` to give mail access through the relay
+- include `gemini_api_key` to give shared Gemini access
+- include `anthropic_api_key` to give shared Claude access
+- omit all three for no shared access
+
+The wizard never reveals raw `SMTP_USER` or `SMTP_PASSWORD`.
 
 ---
 
@@ -137,8 +175,10 @@ If you prefer to send from your own email instead, see the **Own email sender** 
 ```bash
 pip install -r requirements.txt
 export RECIPIENT_EMAIL="you@example.com"
-export SMTP_USER="you@gmail.com"        # optional — uses relay without this
-export SMTP_PASSWORD="your-app-password" # optional — uses relay without this
+export DIGEST_RELAY_TOKEN="your-relay-token"  # if you have relay access
+# or, send directly from your own mailbox instead:
+export SMTP_USER="you@gmail.com"
+export SMTP_PASSWORD="your-app-password"
 python digest.py
 ```
 

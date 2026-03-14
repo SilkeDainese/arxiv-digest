@@ -1511,7 +1511,11 @@ RELAY_URL = os.environ.get(
     "DIGEST_RELAY_URL",
     "https://arxiv-digest-relay.vercel.app/api/send",
 )
-RELAY_TOKEN = os.environ.get("DIGEST_RELAY_TOKEN", "arxiv-digest-v1-relay")
+
+
+def _get_relay_token() -> str:
+    """Return the relay token or an empty string if not configured."""
+    return os.environ.get("DIGEST_RELAY_TOKEN", "").strip()
 
 
 def _build_plain_text(date_str: str, paper_count: int,
@@ -1532,8 +1536,14 @@ def _build_plain_text(date_str: str, paper_count: int,
 def _send_via_relay(recipients: list[str], subject: str,
                     html: str, plain_text: str) -> bool:
     """Send email via the shared relay service. Returns True on success."""
+    relay_token = _get_relay_token()
+    if not relay_token:
+        print("❌ Relay send failed: DIGEST_RELAY_TOKEN is not configured.")
+        print("   Add DIGEST_RELAY_TOKEN to your repo secrets or configure SMTP_USER/SMTP_PASSWORD instead.")
+        return False
+
     payload = json.dumps({
-        "token": RELAY_TOKEN,
+        "token": relay_token,
         "recipients": recipients,
         "subject": subject,
         "html": html,
