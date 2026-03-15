@@ -6,27 +6,27 @@ import base64
 import html
 import json
 import os
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
-from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+import importlib.util
+from pathlib import Path
 
-from student_registry import (  # noqa: E402
-    DEFAULT_MAX_PAPERS,
-    build_student_record,
-    now_iso,
-    normalise_email,
-    package_labels,
-    public_record,
-    verify_password,
-)
+_reg_path = Path(__file__).with_name("_registry.py")
+_spec = importlib.util.spec_from_file_location("_registry", _reg_path)
+_registry = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_registry)
+
+DEFAULT_MAX_PAPERS = _registry.DEFAULT_MAX_PAPERS
+build_student_record = _registry.build_student_record
+now_iso = _registry.now_iso
+normalise_email = _registry.normalise_email
+package_labels = _registry.package_labels
+public_record = _registry.public_record
+verify_password = _registry.verify_password
 
 GITHUB_API = "https://api.github.com"
 STORAGE_GITHUB_TOKEN = os.environ.get("STUDENT_STORAGE_GITHUB_TOKEN", "").strip()
