@@ -1,5 +1,6 @@
 import student_digest as sd
 from digest import _render_footer
+from setup.student_presets import build_au_student_config
 from student_digest import annotate_student_packages, make_student_digest_config, select_student_papers
 from student_registry import (
     build_student_record,
@@ -159,6 +160,19 @@ def test_normalise_public_subscription_clamps_and_validates():
         "max_papers_per_week": 20,
         "active": False,
     }
+
+
+def test_build_au_student_config_treats_au_astronomy_as_implicit_baseline():
+    config = build_au_student_config(
+        "Student Example",
+        "student@example.com",
+        ["au_astronomy", "galaxies", "cosmology"],
+        "simple_and_important",
+    )
+
+    assert config["student_tracks"] == ["AU Astronomy", "Galaxies", "Cosmology"]
+    assert config["categories"] == ["astro-ph.GA", "astro-ph.CO"]
+    assert "galaxies, and cosmology" in config["research_context"].lower()
 
 
 def test_footer_uses_student_manage_links_when_present():

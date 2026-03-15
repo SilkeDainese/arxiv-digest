@@ -403,12 +403,18 @@ def render_au_student_setup() -> None:
         key="au_student_email",
     )
 
+    selectable_tracks = [
+        track_id
+        for track_id in AU_STUDENT_TRACK_LABELS
+        if track_id != "au_astronomy"
+    ]
+
     selected_tracks = st.multiselect(
         "Astronomy interests",
-        options=list(AU_STUDENT_TRACK_LABELS.keys()),
-        default=list(AU_STUDENT_TRACK_LABELS.keys()),
+        options=selectable_tracks,
+        default=selectable_tracks,
         format_func=lambda key: AU_STUDENT_TRACK_LABELS[key],
-        help="These tracks are biased toward readable and important papers for students.",
+        help="Choose the optional astronomy interests to layer on top of the always-included AU astronomy baseline.",
     )
 
     reading_mode = st.radio(
@@ -426,7 +432,7 @@ def render_au_student_setup() -> None:
         "AU Astronomy is included for every student digest: AU astronomy papers, AU-run telescope keywords, and AU student-space projects."
     )
     st.caption(
-        f"`{AU_STUDENT_ALWAYS_TAG}` is preselected here as a visible tag, and it stays included for every student even if someone unticks it."
+        f"`{AU_STUDENT_ALWAYS_TAG}` is not a normal toggle here. It is added automatically for every AU student config."
     )
 
     if not student_email.strip():

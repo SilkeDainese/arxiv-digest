@@ -12,6 +12,15 @@ from setup.data import (
 )
 
 
+def _au_student_optional_track_ids() -> list[str]:
+    """Return the selectable AU-student tracks, excluding the always-on baseline."""
+    return [
+        track_id
+        for track_id in AU_STUDENT_TRACK_LABELS
+        if track_id != "au_astronomy"
+    ]
+
+
 def _merge_mini_keywords(track_ids: list[str]) -> dict[str, int]:
     """Merge preset keyword weights, keeping the highest weight per term."""
     merged: dict[str, int] = {}
@@ -126,7 +135,11 @@ def build_au_student_config(
     student_name: str, student_email: str, track_ids: list[str], reading_mode: str
 ) -> dict:
     """Build a hidden AU-student digest config with AU astronomy defaults."""
-    selected = track_ids or list(AU_STUDENT_TRACK_LABELS.keys())
+    selected = [
+        track_id
+        for track_id in track_ids
+        if track_id in AU_STUDENT_TRACK_LABELS and track_id != "au_astronomy"
+    ] or _au_student_optional_track_ids()
     categories: list[str] = []
     for track_id in selected:
         for category in ASTRO_MINI_TRACKS.get(track_id, {}).get("categories", []):
