@@ -2,7 +2,7 @@
 
 **Your personal arXiv paper curator** — fetches new papers, scores them against your research, and delivers a digest to your inbox.
 
-<img src=".github/sample-digest.png" width="680" alt="Sample arXiv Digest email showing a TOP PICK paper card with relevance score, research context summary, and feedback arrows">
+<img src=".github/sample-digest.png" width="480" alt="Sample arXiv Digest email showing a TOP PICK paper card with relevance score, research context summary, and feedback arrows">
 
 Created by [Silke S. Dainese](https://silkedainese.github.io) · [dainese@phys.au.dk](mailto:dainese@phys.au.dk) · [ORCID](https://orcid.org/0009-0001-7885-2439)
 
@@ -32,15 +32,14 @@ This creates your own copy. Everything runs in your fork — nothing is shared b
 
 In your fork: **Add file → Upload files** → drag in `config.yaml` → **Commit changes**.
 
-Then add [GitHub Actions secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions):
+Now add your secrets. Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
 
-- `RECIPIENT_EMAIL` — where your digest arrives
-- **Email delivery** (pick one):
-  - `DIGEST_RELAY_TOKEN` — if the maintainer gave you an invite code
-  - `SMTP_USER` + `SMTP_PASSWORD` — to send from your own mailbox ([Gmail App Password →](https://myaccount.google.com/apppasswords))
-- **Optional:** `GEMINI_API_KEY` ([free →](https://aistudio.google.com/apikey)) or `ANTHROPIC_API_KEY` for AI-powered scoring
+- `RECIPIENT_EMAIL` — your email address
+- `DIGEST_RELAY_TOKEN` — the token from the setup wizard (if you got an invite code)
 
-Then go to **Actions** → enable workflows → click **arXiv Digest** → **Run workflow**.
+> **No invite code?** Use your own email account instead: add `SMTP_USER` (your email) and `SMTP_PASSWORD` ([Gmail App Password →](https://myaccount.google.com/apppasswords)) instead of the relay token.
+
+Finally: **Actions** tab → enable workflows → **arXiv Digest** → **Run workflow**.
 
 **That's it.** Your digest now runs automatically **Mon/Wed/Fri at 9am Danish time**.
 
@@ -53,10 +52,14 @@ Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the 
 
 ---
 
-> **Do I need an API key?** No — keyword scoring works without any key. AI keys improve quality but are optional.
+> **Do I need an API key?** No — keyword scoring works without any key. Add one later if you want smarter ranking.
+
 > **Can I change the schedule?** Yes — edit the cron line in `.github/workflows/digest.yml`.
+
 > **Can I run it locally?** `python digest.py --preview` renders a digest in your browser without sending email.
+
 > **How do I pause or unsubscribe?** Disable the workflow or delete the fork — see [Managing Your Digest](#managing-your-digest).
+
 > **How do I give feedback on papers?** Click the ↑/↓ arrows on each card. Future digests learn from your votes.
 
 ---
@@ -74,11 +77,9 @@ flowchart LR
     E --> F["📧 Digest\n(top papers delivered)"]
 ```
 
-**Step 1 — Keyword matching.** Your keywords are matched against each paper's title and abstract, weighted by the importance you assigned (1–10). The matcher is fuzzy on purpose: plurals, hyphenation, and close variants like `planet` / `planetary` are treated as related. Papers below a minimum score are filtered out.
-
-**Step 2 — AI re-ranking.** If you have an AI key, the AI reads your `research_context` — your free-text research description — and re-ranks the keyword-matched papers by *actual relevance* to your work, not just term overlap. The more specific your description, the better the scoring.
-
-**Step 3 — Author boost.** Papers by your `research_authors` get a relevance bump. Papers you authored yourself get a celebration section. Colleagues are always shown regardless of score.
+1. **Keyword matching** — your keywords vs. each paper's title and abstract, weighted 1–10. Fuzzy: `planet` matches `planetary`.
+2. **AI re-ranking** — reads your free-text research description and re-ranks by *actual relevance*, not just term overlap. The more specific your description, the better.
+3. **Author boost** — papers by your collaborators get bumped. Papers you authored get a celebration section.
 
 **What if AI is unavailable?** The system cascades automatically:
 
@@ -96,11 +97,11 @@ If one tier fails, the next takes over. You always get a digest.
 
 ## Optional Upgrades
 
-| Upgrade | What it does | How to set it up |
-|---------|--------------|------------------|
-| **Your own AI key** | Better paper ranking | Add `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` as a repo secret. Set `own_api_key: true` in config.yaml |
-| **Feedback arrows** | ↑/↓ buttons to improve future scoring | Set `github_repo: "yourusername/arxiv-digest"` in config.yaml |
-| **Keyword tracking** | Track which keywords match papers over time | **Settings → Actions → General → Workflow permissions** → "Read and write" |
+| Upgrade | What it does | How |
+|---------|--------------|-----|
+| **AI scoring** | Smarter paper ranking | Add `GEMINI_API_KEY` ([free →](https://aistudio.google.com/apikey)) or `ANTHROPIC_API_KEY` as a repo secret |
+| **Feedback arrows** | ↑/↓ buttons to improve future scoring | Set `github_repo` in your config.yaml |
+| **Keyword tracking** | See which keywords match over time | **Settings → Actions → Workflow permissions** → "Read and write" |
 
 ---
 
