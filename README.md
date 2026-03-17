@@ -5,6 +5,11 @@
     Created by <a href="https://silkedainese.github.io">Silke S. Dainese</a> ·
     <a href="mailto:dainese@phys.au.dk">dainese@phys.au.dk</a> ·
     <a href="https://orcid.org/0009-0001-7885-2439">ORCID</a>
+  </sub><br>
+  <sub>
+    <a href="https://arxiv-digest-setup.streamlit.app"><b>Open setup →</b></a> ·
+    <a href="#quick-start">Quick Start</a> ·
+    <a href="#faq">FAQ</a>
   </sub>
 </p>
 
@@ -33,7 +38,8 @@ From another field? [Write me](mailto:dainese@phys.au.dk) and I'll set up packag
 </details>
 
 <p align="center">
-  <img src=".github/sample-digest.png" width="480" alt="Sample arXiv Digest email showing a TOP PICK paper card with relevance score, research context summary, and feedback arrows">
+  <img src=".github/sample-digest.png" width="480" alt="Sample arXiv Digest email showing a TOP PICK paper card with relevance score, research context summary, and feedback arrows"><br>
+  <sub>Example digest email — TOP PICK card with relevance score and feedback arrows.</sub>
 </p>
 
 <details>
