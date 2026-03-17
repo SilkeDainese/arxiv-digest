@@ -4,6 +4,7 @@ import os
 import time
 
 import scripts.friend_setup as friend_setup
+import yaml
 from scripts.friend_setup import pick_downloaded_config, prepare_config_text, rewrite_top_level_scalar
 
 
@@ -84,3 +85,48 @@ def test_collect_secret_values_allows_repo_only(monkeypatch):
 
     assert mode == "3"
     assert collected == {}
+
+
+def test_collect_secret_values_can_skip_recipient_secret_when_config_has_it(monkeypatch):
+    answers = iter(["1", ""])
+    secrets = iter(["relay-token", "", ""])
+
+    monkeypatch.setattr(builtins, "input", lambda _: next(answers))
+    monkeypatch.setattr(friend_setup.getpass, "getpass", lambda _: next(secrets))
+
+    collected, mode = friend_setup.collect_secret_values(
+        recipient_email="student@example.com",
+        recipient_in_config=True,
+    )
+
+    assert mode == "1"
+    assert collected == {"DIGEST_RELAY_TOKEN": "relay-token"}
+
+
+def test_build_au_student_terminal_config(monkeypatch):
+    answers = iter(
+        [
+            "Student Example",
+            "student@example.com",
+            "y",
+            "n",
+            "y",
+            "n",
+            "2",
+        ]
+    )
+
+    monkeypatch.setattr(builtins, "input", lambda _: next(answers))
+
+    config_text, recipient_email = friend_setup.build_au_student_terminal_config()
+    config = yaml.safe_load(config_text)
+
+    assert recipient_email == "student@example.com"
+    assert config["recipient_email"] == "student@example.com"
+    assert config["student_tracks"] == [
+        "AU Astronomy",
+        "Planets + exoplanets",
+        "Galaxies",
+    ]
+    assert config["max_papers"] == 4
+    assert config["min_score"] == 6

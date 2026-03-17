@@ -14,6 +14,12 @@ import time
 import webbrowser
 from pathlib import Path
 
+import yaml
+
+from setup.data import AU_STUDENT_TRACK_LABELS
+from setup.student_presets import build_au_student_config
+from student_registry import AVAILABLE_STUDENT_PACKAGES
+
 
 DEFAULT_SOURCE_REPO = "SilkeDainese/arxiv-digest"
 DEFAULT_SETUP_URL = "https://arxiv-digest-setup.streamlit.app"
@@ -24,6 +30,7 @@ DOWNLOAD_PATTERNS = (
     "config*.yml",
 )
 DOWNLOAD_STABLE_AGE_SECONDS = 1.0
+AU_STUDENT_TERMINAL_TRACKS = list(AVAILABLE_STUDENT_PACKAGES)
 
 
 class SetupError(RuntimeError):
@@ -180,6 +187,11 @@ def prepare_config_text(config_path: Path, fork_repo: str) -> str:
     return rewrite_top_level_scalar(text, "github_repo", fork_repo)
 
 
+def prepare_generated_config_text(config_text: str, fork_repo: str) -> str:
+    """Point a generated YAML config at the new fork."""
+    return rewrite_top_level_scalar(config_text, "github_repo", fork_repo)
+
+
 def repo_exists(repo: str) -> bool:
     """Return True if the given repo already exists."""
     result = run_command(
@@ -272,7 +284,12 @@ def set_actions_secret(repo: str, name: str, value: str) -> None:
     )
 
 
-def configure_actions(repo: str) -> None:
+def set_actions_variable(repo: str, name: str, value: str) -> None:
+    """Write one GitHub Actions variable."""
+    run_command(["gh", "variable", "set", name, "-R", repo, "--body", value])
+
+
+def configure_actions(repo: str, *, source_repo: str) -> None:
     """Enable Actions and let the workflow write keyword stats back."""
     run_command(
         [
@@ -301,6 +318,8 @@ def configure_actions(repo: str) -> None:
         ]
     )
     run_command(["gh", "workflow", "enable", "digest.yml", "-R", repo], check=False)
+    run_command(["gh", "workflow", "enable", "sync-upstream.yml", "-R", repo], check=False)
+    set_actions_variable(repo, "UPSTREAM_REPO", source_repo)
 
 
 def collect_optional_ai_secrets() -> dict[str, str]:
@@ -315,7 +334,9 @@ def collect_optional_ai_secrets() -> dict[str, str]:
     return secrets
 
 
-def collect_secret_values() -> tuple[dict[str, str], str]:
+def collect_secret_values(
+    *, recipient_email: str = "", recipient_in_config: bool = False
+) -> tuple[dict[str, str], str]:
     """Prompt for the secrets to install in the new fork."""
     mode = prompt_choice(
         "\nChoose how this fork should deliver email:",
@@ -343,7 +364,15 @@ def collect_secret_values() -> tuple[dict[str, str], str]:
         return {}, mode
 
     secrets: dict[str, str] = {}
-    secrets["RECIPIENT_EMAIL"] = prompt("Recipient email")
+    if recipient_in_config:
+        recipient = prompt(
+            "RECIPIENT_EMAIL (optional; leave blank to use config.yaml)",
+            required=False,
+        )
+        if recipient:
+            secrets["RECIPIENT_EMAIL"] = recipient
+    else:
+        secrets["RECIPIENT_EMAIL"] = prompt("Recipient email", default=recipient_email or None)
 
     if mode == "1":
         secrets["DIGEST_RELAY_TOKEN"] = prompt_secret("DIGEST_RELAY_TOKEN")
@@ -354,6 +383,53 @@ def collect_secret_values() -> tuple[dict[str, str], str]:
     secrets.update(collect_optional_ai_secrets())
 
     return secrets, mode
+
+
+def collect_au_student_track_ids() -> list[str]:
+    """Prompt for AU student package interests."""
+    while True:
+        selected: list[str] = []
+        print("\nChoose the astronomy packages this student wants:")
+        for track_id in AU_STUDENT_TERMINAL_TRACKS:
+            label = AU_STUDENT_TRACK_LABELS[track_id]
+            if prompt_yes_no(f"Interested in {label}?", default=True):
+                selected.append(track_id)
+        if selected:
+            return selected
+        print("Pick at least one package.")
+
+
+def build_au_student_terminal_config() -> tuple[str, str]:
+    """Build an AU student config directly in the terminal."""
+    student_name = prompt("Student name", required=False)
+    student_email = prompt("Student email")
+    track_ids = collect_au_student_track_ids()
+    reading_mode = prompt_choice(
+        "\nChoose the weekly reading style:",
+        [
+            (
+                "1",
+                "Simple + important",
+                "Readable weekly highlights with a slightly wider net.",
+            ),
+            (
+                "2",
+                "Only the biggest papers",
+                "A stricter shortlist of the most important papers each week.",
+            ),
+        ],
+        default="1",
+    )
+    config = build_au_student_config(
+        student_name=student_name,
+        student_email=student_email,
+        track_ids=track_ids,
+        reading_mode="simple_and_important" if reading_mode == "1" else "biggest_only",
+    )
+    return (
+        yaml.dump(config, default_flow_style=False, sort_keys=False, allow_unicode=True),
+        student_email,
+    )
 
 
 def verify_gh_ready() -> None:
@@ -374,6 +450,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fork-name")
     parser.add_argument("--repo", help="Use an existing OWNER/REPO instead of creating a fork.")
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--au-student", action="store_true")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--no-run", action="store_true")
     return parser
@@ -391,32 +468,62 @@ def main() -> int:
     ensure_fork(args.source_repo, target_repo)
 
     config_path = args.config_path
-    if config_path is None:
-        if not args.no_browser:
-            print(f"Opening the setup wizard: {args.setup_url}")
-            webbrowser.open(args.setup_url)
-        print(f"Waiting for config.yaml in {args.downloads_dir} ...")
-        started_at = time.time()
-        config_path = wait_for_downloaded_config(
-            args.downloads_dir,
-            started_at=started_at,
-            timeout_seconds=args.timeout,
-        )
-        print(f"Found config file: {config_path}")
-    elif not config_path.exists():
-        raise SetupError(f"Config file not found: {config_path}")
+    config_text: str
+    recipient_email = ""
+    recipient_in_config = False
 
-    config_text = prepare_config_text(config_path, target_repo)
+    if config_path is not None:
+        if not config_path.exists():
+            raise SetupError(f"Config file not found: {config_path}")
+        config_text = prepare_config_text(config_path, target_repo)
+    else:
+        config_source = "2" if args.au_student else prompt_choice(
+            "\nChoose how to build the digest config:",
+            [
+                (
+                    "1",
+                    "Setup wizard in browser",
+                    "Open Streamlit, download config.yaml, then let this script finish the repo setup.",
+                ),
+                (
+                    "2",
+                    "AU student packages in terminal",
+                    "Answer yes/no for the astronomy packages and generate the AU student config here.",
+                ),
+            ],
+            default="1",
+        )
+        if config_source == "2":
+            generated_config, recipient_email = build_au_student_terminal_config()
+            recipient_in_config = True
+            config_text = prepare_generated_config_text(generated_config, target_repo)
+        else:
+            if not args.no_browser:
+                print(f"Opening the setup wizard: {args.setup_url}")
+                webbrowser.open(args.setup_url)
+            print(f"Waiting for config.yaml in {args.downloads_dir} ...")
+            started_at = time.time()
+            config_path = wait_for_downloaded_config(
+                args.downloads_dir,
+                started_at=started_at,
+                timeout_seconds=args.timeout,
+            )
+            print(f"Found config file: {config_path}")
+            config_text = prepare_config_text(config_path, target_repo)
+
     upload_config(target_repo, config_text, author_name=login)
     print(f"Uploaded config.yaml to {target_repo}")
 
     print("\nNow choose what to set up for this fork.")
-    secrets, secret_mode = collect_secret_values()
+    secrets, secret_mode = collect_secret_values(
+        recipient_email=recipient_email,
+        recipient_in_config=recipient_in_config,
+    )
     for name, value in secrets.items():
         set_actions_secret(target_repo, name, value)
         print(f"Set secret: {name}")
 
-    configure_actions(target_repo)
+    configure_actions(target_repo, source_repo=args.source_repo)
     print("Enabled Actions and workflow write permissions.")
 
     if secret_mode == "3":
