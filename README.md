@@ -19,14 +19,14 @@ From another field? [Write me](mailto:dainese@phys.au.dk) and I'll set up packag
 
 ## Quick Start
 
-> 1. **[Open the config page →](https://arxiv-digest-setup.streamlit.app)** — it guides you through everything. Download `config.yaml` when done.
-> 2. **[Fork this repo →](https://github.com/SilkeDainese/arxiv-digest/fork)**, then upload `config.yaml` to the repo root:
->    `Add file` → `Upload files` → select `config.yaml` → `Commit changes`
-> 3. Add [secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions): `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
->    - `RECIPIENT_EMAIL` — your email address
->    - `DIGEST_RELAY_TOKEN` — the token from the config page *(no invite code? use `SMTP_USER` + `SMTP_PASSWORD` [instead](https://myaccount.google.com/apppasswords))*
-> 4. Run it: `Actions` → enable workflows → `arXiv Digest` → `Run workflow`
->
+1. **[Open the config page →](https://arxiv-digest-setup.streamlit.app)** — it guides you through everything. Download `config.yaml` when done.
+2. **[Fork this repo →](https://github.com/SilkeDainese/arxiv-digest/fork)**, then upload `config.yaml` to the repo root:
+   `Add file` → `Upload files` → select `config.yaml` → `Commit changes`
+3. Add [secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions): `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
+   - `RECIPIENT_EMAIL` — your email address
+   - `DIGEST_RELAY_TOKEN` — the token from the config page *(no invite code? use `SMTP_USER` + `SMTP_PASSWORD` [instead](https://myaccount.google.com/apppasswords))*
+4. Run it: `Actions` → enable workflows → `arXiv Digest` → `Run workflow`
+
 > **That's it.** *Runs automatically Mon/Wed/Fri at 9am Danish time.*
 
 <img src=".github/sample-digest.png" width="480" alt="Sample arXiv Digest email showing a TOP PICK paper card with relevance score, research context summary, and feedback arrows">
@@ -82,6 +82,8 @@ Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the 
 </details>
 
 ### How it works
+
+Keywords + optional AI re-ranking + collaborator boost. Details:
 
 <details>
 <summary>How does scoring work?</summary>
