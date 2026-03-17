@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arXiv Digest — UX Lab v4</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;600&family=DM+Mono:wght@400&display=swap');
+  :root {
+    --pine: #2F4F3E; --pine-light: #3D6B52; --pine-wash: #EDF2EF;
+    --gold: #EBC944; --gold-wash: #FFF8E1;
+    --ash-white: #F6F5F2; --ash-black: #2B2B2B;
+    --warm-grey: #6A6A66; --card-border: #D8D6D0;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:var(--ash-white); color:var(--ash-black); min-height:100vh; }
+
+  /* Header */
+  .app-header { background:var(--pine); border-bottom:3px solid var(--gold); padding:14px 32px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .app-header h1 { font-family:'DM Serif Display',Georgia,serif; color:white; font-size:22px; font-weight:normal; }
+  .app-header .byline { font-family:'DM Mono',monospace; font-size:10px; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.1em; margin-top:2px; }
+  .access-code-area { display:flex; align-items:center; gap:8px; }
+  .access-btn { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.7); padding:6px 14px; border-radius:6px; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; }
+  .access-btn:hover { background:rgba(255,255,255,0.15); color:white; }
+  .access-expanded { display:none; align-items:center; gap:6px; }
+  .access-expanded.show { display:flex; animation:slideIn .2s ease; }
+  @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+  .access-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3); color:white; padding:6px 12px; border-radius:4px; font-family:'DM Mono',monospace; font-size:12px; width:160px; outline:none; }
+  .access-input::placeholder { color:rgba(255,255,255,0.3); }
+  .access-input:focus { border-color:var(--gold); }
+  .access-submit { background:var(--gold); color:var(--pine); border:none; padding:6px 12px; border-radius:4px; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; font-weight:600; }
+  .access-status { font-family:'DM Mono',monospace; font-size:11px; padding:4px 10px; border-radius:4px; display:none; }
+  .access-status.approved { display:inline-block; background:rgba(47,79,62,0.3); color:#90EE90; border:1px solid rgba(144,238,144,0.3); }
+  .access-status.denied { display:inline-block; background:rgba(192,57,43,0.2); color:#ff9999; border:1px solid rgba(255,153,153,0.3); }
+  .access-close { background:none; border:none; color:rgba(255,255,255,0.4); font-size:16px; cursor:pointer; }
+
+  /* Mode + AI */
+  .mode-bar { max-width:660px; margin:24px auto 0; display:flex; border-radius:8px; overflow:hidden; border:1px solid var(--card-border); }
+  .mode-option { flex:1; padding:12px 16px; text-align:center; cursor:pointer; font-size:13px; background:white; color:var(--warm-grey); border-right:1px solid var(--card-border); transition:all .15s; }
+  .mode-option:last-child { border-right:none; }
+  .mode-option.active { background:var(--pine-wash); color:var(--pine); font-weight:600; box-shadow:inset 0 -2px 0 var(--pine); }
+  .ai-toggle-bar { max-width:660px; margin:12px auto 0; padding:10px 16px; background:white; border:1px solid var(--card-border); border-radius:8px; }
+  .ai-toggle-row { display:flex; align-items:center; justify-content:space-between; }
+  .ai-key-row { display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--card-border); }
+  .ai-key-row.show { display:flex; gap:8px; align-items:flex-end; animation:slideIn .2s ease; }
+  .ai-key-row .field { flex:1; }
+  .ai-key-input { background:var(--ash-white); border:1px solid var(--card-border); border-radius:4px; padding:7px 10px; font-family:'DM Mono',monospace; font-size:12px; width:100%; outline:none; }
+  .ai-key-input:focus { border-color:var(--pine); }
+  .ai-key-input::placeholder { color:var(--warm-grey); }
+  .ai-key-status { font-family:'DM Mono',monospace; font-size:11px; padding:3px 8px; border-radius:4px; }
+  .ai-key-status.ok { background:var(--pine-wash); color:var(--pine); }
+  .ai-key-status.err { background:#FFF0F0; color:#C0392B; }
+  .ai-toggle-label { font-size:13px; }
+  .ai-toggle-label small { color:var(--warm-grey); font-size:11px; display:block; margin-top:2px; }
+  .toggle-switch { position:relative; width:44px; height:24px; cursor:pointer; }
+  .toggle-switch input { display:none; }
+  .toggle-track { position:absolute; inset:0; background:var(--card-border); border-radius:12px; transition:background .2s; }
+  .toggle-switch input:checked + .toggle-track { background:var(--pine); }
+  .toggle-thumb { position:absolute; top:2px; left:2px; width:20px; height:20px; background:white; border-radius:50%; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+  .toggle-switch input:checked ~ .toggle-thumb { transform:translateX(20px); }
+
+  .main { max-width:660px; margin:0 auto; padding:16px 0 60px; }
+
+  /* Steps */
+  .step { background:white; border:1px solid var(--card-border); border-radius:10px; margin-top:12px; overflow:hidden; }
+  .step.collapsed .step-body { display:none; }
+  .step.completed { border-color:var(--pine-light); }
+  .step.completed .step-header { background:var(--pine-wash); }
+  .step-header { display:flex; align-items:center; padding:14px 18px; gap:10px; cursor:pointer; user-select:none; }
+  .step-header:hover { background:#fafaf8; }
+  .step.completed .step-header:hover { background:#e4ede6; }
+  .step-num { background:var(--pine); color:white; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:13px; flex-shrink:0; }
+  .step.completed .step-num { background:var(--pine-light); }
+  .step-title { font-family:'DM Serif Display',Georgia,serif; font-size:16px; flex:1; }
+  .step-badge { font-family:'DM Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-grey); background:var(--ash-white); padding:3px 8px; border-radius:4px; }
+  .step-summary { display:none; font-family:'DM Mono',monospace; font-size:10px; color:var(--pine-light); background:rgba(47,79,62,0.08); padding:3px 8px; border-radius:4px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .step.completed .step-summary { display:inline-block; }
+  .step.completed .step-badge { display:none; }
+  .step-chevron { color:var(--card-border); font-size:18px; transition:transform .2s; }
+  .step:not(.collapsed) .step-chevron { transform:rotate(90deg); }
+  .step-body { padding:0 18px 18px; border-top:1px solid var(--card-border); }
+  .step-body > p { font-size:13px; color:var(--warm-grey); margin:12px 0 14px; line-height:1.5; }
+
+  /* Form */
+  .field-row { display:flex; gap:10px; margin-bottom:10px; }
+  .field { flex:1; min-width:0; }
+  .field label { display:block; font-family:'DM Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-grey); margin-bottom:4px; }
+  .mock-input { background:var(--ash-white); border:1px solid var(--card-border); border-radius:6px; padding:9px 12px; font-size:13px; color:var(--warm-grey); font-style:italic; width:100%; }
+  .mock-input.filled { color:var(--ash-black); font-style:normal; background:white; border-color:var(--pine-light); }
+  .mock-input.autofilled { background:var(--pine-wash); border-color:var(--pine-light); }
+  .mock-textarea { background:var(--ash-white); border:1px solid var(--card-border); border-radius:6px; padding:9px 12px; font-size:13px; color:var(--warm-grey); font-style:italic; min-height:80px; width:100%; line-height:1.5; }
+
+  /* Chips */
+  .chip-group { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .chip { display:inline-flex; align-items:center; gap:4px; border-radius:16px; padding:4px 12px; font-size:12px; cursor:default; }
+  .chip-pine { background:var(--pine-wash); border:1px solid #c0d4c6; color:var(--pine); }
+  .chip-gold { background:var(--gold-wash); border:1px solid #e8d47a; color:#8a6f00; }
+  .chip-ghost { background:transparent; border:1px dashed var(--card-border); color:var(--warm-grey); cursor:pointer; font-style:italic; }
+  .chip-ghost:hover { border-color:var(--pine); color:var(--pine); }
+  .chip .remove { font-size:10px; opacity:.5; cursor:pointer; }
+  .chip .remove:hover { opacity:1; }
+  .autofill-tag { font-family:'DM Mono',monospace; font-size:10px; color:var(--pine-light); background:var(--pine-wash); padding:2px 8px; border-radius:3px; margin-left:6px; }
+
+  .section-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--warm-grey); margin:16px 0 4px; }
+  .section-desc { font-size:12px; color:var(--warm-grey); margin:0 0 8px; line-height:1.5; }
+  .note { font-size:11px; color:var(--warm-grey); font-style:italic; margin-top:4px; }
+
+  /* AI foldout */
+  .ai-foldout { border:1px solid #e8d47a; border-radius:8px; margin:8px 0; overflow:hidden; }
+  .ai-foldout.disabled { border-color:var(--card-border); opacity:.5; }
+  .ai-foldout-header { background:var(--gold-wash); padding:10px 14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; }
+  .ai-foldout.disabled .ai-foldout-header { background:#f5f5f3; }
+  .ai-foldout-title { font-size:12px; font-weight:600; color:#8a6f00; display:flex; align-items:center; gap:6px; }
+  .ai-foldout.disabled .ai-foldout-title { color:var(--warm-grey); }
+  .ai-foldout-chevron { font-size:14px; color:#a08520; transition:transform .2s; }
+  .ai-foldout.collapsed .ai-foldout-body { display:none; }
+  .ai-foldout:not(.collapsed) .ai-foldout-chevron { transform:rotate(90deg); }
+  .ai-foldout-body { padding:10px 14px; background:var(--gold-wash); border-top:1px solid #e8d47a; }
+  .ai-foldout.disabled .ai-foldout-body { background:#f5f5f3; }
+  .ai-foldout-hint { font-size:11px; color:#a08520; margin-bottom:8px; font-style:italic; }
+  .ai-foldout-actions { display:flex; gap:8px; margin-top:8px; }
+  .ai-clear-btn { background:none; border:1px solid #d4b94a; color:#8a6f00; font-size:11px; padding:3px 10px; border-radius:4px; cursor:pointer; font-family:'DM Mono',monospace; }
+  .ai-clear-btn:hover { background:rgba(0,0,0,0.05); }
+
+  /* Category expandable groups */
+  .cat-expander { border:1px solid var(--card-border); border-radius:6px; margin:4px 0; overflow:hidden; }
+  .cat-expander-header { padding:8px 12px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; background:white; }
+  .cat-expander-header:hover { background:#fafaf8; }
+  .cat-expander-name { font-size:13px; font-weight:500; }
+  .cat-expander-meta { display:flex; align-items:center; gap:8px; }
+  .cat-count { font-family:'DM Mono',monospace; font-size:10px; color:var(--warm-grey); background:var(--ash-white); padding:1px 6px; border-radius:3px; }
+  .cat-expander-chevron { font-size:14px; color:var(--card-border); transition:transform .2s; }
+  .cat-expander.open .cat-expander-chevron { transform:rotate(90deg); }
+  .cat-expander-body { display:none; padding:8px 12px; border-top:1px solid var(--card-border); background:var(--ash-white); }
+  .cat-expander.open .cat-expander-body { display:block; }
+
+  /* Keyword table */
+  .kw-table { width:100%; border-collapse:collapse; margin:8px 0; }
+  .kw-table th { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-grey); text-align:left; padding:4px 6px; border-bottom:1px solid var(--card-border); }
+  .kw-table td { padding:5px 6px; border-bottom:1px solid var(--ash-white); font-size:13px; vertical-align:middle; }
+  .kw-name { font-weight:500; }
+  .kw-weight { display:flex; align-items:center; gap:4px; }
+  .kw-arrow { width:20px; height:20px; border:1px solid var(--card-border); border-radius:3px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:11px; color:var(--warm-grey); background:white; user-select:none; }
+  .kw-arrow:hover { border-color:var(--pine); color:var(--pine); background:var(--pine-wash); }
+  .kw-score { font-family:'DM Mono',monospace; font-size:12px; min-width:20px; text-align:center; }
+  .kw-label { font-family:'DM Mono',monospace; font-size:10px; white-space:nowrap; display:block; margin-top:1px; }
+  .kw-label.low { color:var(--warm-grey); }
+  .kw-label.mid { color:#8a6f00; }
+  .kw-label.high { color:var(--pine-light); }
+  .kw-label.max { color:var(--pine); font-weight:700; }
+  .kw-always input[type="checkbox"] { accent-color:var(--pine); width:14px; height:14px; }
+
+  .explainer { background:var(--ash-white); border:1px solid var(--card-border); border-radius:6px; padding:10px 14px; margin:6px 0 10px; font-size:12px; color:var(--warm-grey); line-height:1.5; }
+  .explainer strong { color:var(--ash-black); }
+
+  .btn-primary { background:var(--pine); color:white; border:none; border-radius:6px; padding:10px 20px; font-size:13px; cursor:pointer; margin-top:12px; }
+  .btn-primary:hover { background:var(--pine-light); }
+  .btn-secondary { background:white; color:var(--pine); border:1px solid var(--pine); border-radius:6px; padding:8px 14px; font-size:12px; cursor:pointer; }
+  .btn-secondary:hover { background:var(--pine-wash); }
+  .btn-clear { background:none; border:1px solid var(--card-border); color:var(--warm-grey); font-size:11px; padding:3px 10px; border-radius:4px; cursor:pointer; font-family:'DM Mono',monospace; }
+  .btn-clear:hover { border-color:var(--warm-grey); color:var(--ash-black); }
+
+  /* Draggable groups */
+  .divider { border:none; border-top:1px solid var(--card-border); margin:16px 0; }
+
+  .radio-group { display:flex; gap:8px; margin:6px 0; }
+  .radio-option { flex:1; padding:10px 12px; border:1px solid var(--card-border); border-radius:6px; cursor:pointer; background:white; color:var(--warm-grey); transition:all .15s; }
+  .radio-option.active { border-color:var(--pine); background:var(--pine-wash); color:var(--pine); }
+  .radio-title { font-weight:600; font-size:13px; }
+  .radio-desc { font-size:11px; margin-top:3px; line-height:1.4; }
+
+  /* Email card preview */
+  .email-card { background:white; border:1px solid var(--card-border); border-radius:8px; margin:10px 0; overflow:hidden; font-size:12px; }
+  .email-card-topbar { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--pine-wash); border-bottom:1px solid var(--card-border); }
+  .email-card-title { font-family:'DM Serif Display',Georgia,serif; font-size:14px; color:var(--pine); flex:1; }
+  .email-card-score { font-family:'DM Mono',monospace; font-size:11px; background:var(--gold-wash); color:#8a6f00; padding:2px 8px; border-radius:4px; margin-left:8px; flex-shrink:0; }
+  .email-card-authors { padding:6px 14px; font-size:11px; color:var(--warm-grey); border-bottom:1px solid var(--ash-white); }
+  .email-card-body { padding:10px 14px; }
+  .email-card-section { padding:6px 0; }
+  .email-card-label { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-grey); margin-bottom:2px; }
+  .email-card-tags { margin-top:8px; display:flex; flex-wrap:wrap; gap:4px; }
+  .ep-tag { display:inline-flex; align-items:center; gap:3px; background:var(--pine-wash); color:var(--pine); font-size:10px; padding:2px 8px; border-radius:3px; }
+  .ep-tag .tag-arrows { display:flex; gap:1px; margin-left:2px; }
+  .ep-tag .tag-arrow { font-size:8px; cursor:pointer; opacity:.5; }
+  .ep-tag .tag-arrow:hover { opacity:1; }
+  .abstract-toggle { color:var(--pine); font-size:11px; cursor:pointer; text-decoration:underline; margin-top:6px; display:inline-block; }
+  .abstract-content { display:none; margin-top:6px; font-size:11px; color:var(--ash-black); line-height:1.5; padding:8px 10px; background:var(--ash-white); border-radius:4px; border:1px solid var(--card-border); }
+  .abstract-content.show { display:block; }
+
+  /* Highlight pulse when toggled on */
+  @keyframes highlightPulse { 0%{background:var(--pine-wash);} 100%{background:transparent;} }
+  .email-card-section.highlight { animation:highlightPulse 1.5s ease; outline:2px solid var(--pine-light); outline-offset:2px; border-radius:4px; }
+  .email-card-tags.highlight { animation:highlightPulse 1.5s ease; outline:2px solid var(--pine-light); outline-offset:2px; border-radius:4px; }
+  .email-card-score.highlight { animation:highlightPulse 1.5s ease; outline:2px solid var(--pine-light); outline-offset:2px; border-radius:4px; }
+
+  /* Card element toggles */
+  .card-toggles { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .card-toggle-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:14px; font-size:11px; cursor:pointer; border:1px solid var(--card-border); background:white; color:var(--warm-grey); transition:all .15s; user-select:none; }
+  .card-toggle-chip.on { background:var(--pine-wash); border-color:#c0d4c6; color:var(--pine); }
+  .card-toggle-chip:hover { border-color:var(--pine); }
+  .card-toggle-chip .dot { width:6px; height:6px; border-radius:50%; background:var(--card-border); }
+  .card-toggle-chip.on .dot { background:var(--pine); }
+
+  /* Orderable card element list */
+  .card-order-list { list-style:none; margin:8px 0; padding:0; }
+  .card-order-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--card-border); border-radius:6px; margin-bottom:4px; background:white; transition:all .15s; }
+  .card-order-item.off { opacity:.45; background:var(--ash-white); }
+  .card-order-item .order-toggle { width:18px; height:18px; border:2px solid var(--card-border); border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; flex-shrink:0; }
+  .card-order-item:not(.off) .order-toggle { border-color:var(--pine); color:var(--pine); background:var(--pine-wash); }
+  .card-order-item .order-label { flex:1; font-size:12px; }
+  .card-order-item .order-arrows { display:flex; flex-direction:column; gap:0; flex-shrink:0; }
+  .card-order-item .order-arrow { cursor:pointer; font-size:10px; color:var(--card-border); padding:0 4px; line-height:1.2; user-select:none; }
+  .card-order-item:not(.off) .order-arrow { color:var(--warm-grey); }
+  .card-order-item .order-arrow:hover { color:var(--pine); }
+
+  /* Student / Mini specific */
+  .email-validation { display:flex; gap:6px; align-items:center; margin-top:4px; }
+  .email-validation .status { font-family:'DM Mono',monospace; font-size:11px; padding:3px 8px; border-radius:4px; display:none; }
+  .email-validation .status.ok { display:inline-block; background:var(--pine-wash); color:var(--pine); }
+  .email-validation .status.err { display:inline-block; background:#FFF0F0; color:#C0392B; }
+  .package-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0; }
+  .package-card { border:1px solid var(--card-border); border-radius:8px; padding:12px; cursor:pointer; transition:all .15s; user-select:none; }
+  .package-card:hover { border-color:var(--pine); }
+  .package-card.selected { background:var(--pine-wash); border-color:var(--pine); }
+  .package-card .pkg-name { font-weight:600; font-size:13px; margin-bottom:2px; }
+  .package-card .pkg-desc { font-size:11px; color:var(--warm-grey); line-height:1.4; }
+  .package-card .pkg-check { float:right; width:18px; height:18px; border:2px solid var(--card-border); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:12px; color:transparent; }
+  .package-card.selected .pkg-check { border-color:var(--pine); color:var(--pine); background:var(--pine-wash); }
+  .password-row { display:flex; gap:8px; align-items:flex-end; }
+  .password-row .field { flex:1; }
+  .password-strength { font-family:'DM Mono',monospace; font-size:10px; margin-top:4px; }
+  .mode-flow { display:none; }
+  .mode-flow.active { display:block; }
+
+  /* Header action buttons */
+  .header-actions { display:flex; align-items:center; gap:6px; }
+  .header-btn { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.7); padding:5px 12px; border-radius:6px; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+  .header-btn:hover { background:rgba(255,255,255,0.15); color:white; }
+  .header-btn.gold { border-color:rgba(235,201,68,0.4); color:var(--gold); }
+  .header-btn.gold:hover { background:rgba(235,201,68,0.15); color:var(--gold); }
+  .upload-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; justify-content:center; align-items:center; }
+  .upload-overlay.show { display:flex; }
+  .upload-box { background:white; border-radius:12px; padding:28px; max-width:420px; width:90%; text-align:center; }
+  .upload-dropzone { border:2px dashed var(--card-border); border-radius:8px; padding:32px 20px; margin:14px 0; cursor:pointer; transition:all .15s; }
+  .upload-dropzone:hover { border-color:var(--pine); background:var(--pine-wash); }
+  .upload-dropzone.dragover { border-color:var(--gold); background:var(--gold-wash); }
+
+  .download-area { background:var(--pine-wash); border:2px solid var(--pine); border-radius:10px; padding:20px; text-align:center; margin-top:12px; }
+  .download-btn { background:var(--pine); color:white; border:none; border-radius:8px; padding:14px 32px; font-size:15px; cursor:pointer; font-weight:600; margin-top:8px; }
+  .download-btn:hover { background:var(--pine-light); }
+
+  .app-footer { text-align:center; font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.1em; color:var(--warm-grey); padding:32px 0; }
+  .app-footer a { color:var(--pine); text-decoration:none; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div><h1>arXiv Digest Setup</h1><div class="byline">Built by Silke S. Dainese</div></div>
+  <div class="header-actions">
+    <button class="header-btn" onclick="openUpload()" title="Load an existing config.yaml to edit">&#x21E7; Upload config</button>
+    <div class="access-code-area">
+      <div class="access-status" id="access-status"></div>
+      <div class="access-expanded" id="access-expanded">
+        <input class="access-input" id="access-input" placeholder="paste code" autocomplete="off">
+        <button class="access-submit" onclick="submitAccess()">Submit</button>
+        <button class="access-close" onclick="closeAccess()">&times;</button>
+      </div>
+      <button class="access-btn" id="access-btn" onclick="openAccess()">Access code</button>
+    </div>
+  </div>
+</header>
+
+<div class="mode-bar">
+  <div class="mode-option active" onclick="setMode(this)">Researcher setup</div>
+  <div class="mode-option" onclick="setMode(this)">Mini setup</div>
+  <div class="mode-option" onclick="setMode(this)">AU Student</div>
+</div>
+
+<!-- ═══════ RESEARCHER FLOW ═══════ -->
+<div class="mode-flow active" id="flow-researcher">
+
+<div class="ai-toggle-bar">
+  <div class="ai-toggle-row">
+    <div class="ai-toggle-label">AI-assisted setup<small>Add a Gemini key (free) to auto-fill categories, keywords, and people from your publications.</small></div>
+    <label class="toggle-switch"><input type="checkbox" id="ai-toggle" onchange="toggleAI()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+  </div>
+  <div class="ai-key-row" id="ai-key-row" style="align-items:flex-start;">
+    <div class="field" style="flex:1;">
+      <label>Gemini API key (Google's AI &mdash; free)</label>
+      <input class="ai-key-input" placeholder="AIza..." id="gemini-key">
+      <div class="note"><a href="#" style="color:var(--pine);">Get a free key &rarr;</a> aistudio.google.com</div>
+      <div class="note" style="margin-top:1px;">Free to all with a Google account</div>
+    </div>
+    <div style="margin-top:20px;color:var(--warm-grey);font-size:12px;">or</div>
+    <div class="field" style="flex:1;">
+      <label>Anthropic API key (paid)</label>
+      <input class="ai-key-input" placeholder="sk-ant-..." id="anthropic-key">
+      <div class="note"><a href="#" style="color:var(--pine);">Get a key &rarr;</a> console.anthropic.com</div>
+    </div>
+    <div style="margin-top:20px;"><span class="ai-key-status ok" id="ai-key-status" style="display:none;"></span></div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ═══ 1. ABOUT YOU ═══ -->
+  <div class="step" id="step-1">
+    <div class="step-header" onclick="toggleStep('step-1')"><span class="step-num">1</span><span class="step-title">About You</span><span class="step-summary" id="sum-step-1"></span><span class="step-badge">optional</span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>Enter your ORCID to auto-fill your profile, research description, and more. Or skip and fill manually.</p>
+
+      <div class="field-row">
+        <div class="field" style="flex:3"><label>ORCID ID</label><input class="ai-key-input" id="orcid-input" placeholder="0000-0002-xxxx-xxxx or paste ORCID URL" style="border-radius:6px;width:100%;"></div>
+        <div class="field" style="flex:1;display:flex;align-items:flex-end;"><button class="btn-secondary" style="width:100%;" onclick="simulateOrcidV2()">Look up</button></div>
+      </div>
+
+      <!-- ORCID result + auto-filled profile -->
+      <div id="orcid-result" style="display:none;">
+        <div style="background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;padding:12px 14px;margin-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--pine);">Found: Silke S. Dainese</div>
+              <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Aarhus University &middot; 23 papers &middot; 14 co-authors</div>
+            </div>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--pine);background:rgba(47,79,62,0.15);padding:3px 8px;border-radius:4px;">auto-filled &darr;</span>
+          </div>
+        </div>
+
+        <!-- Auto-filled fields (appear after ORCID lookup) -->
+        <div style="margin-top:12px;">
+          <div class="field-row">
+            <div class="field"><label>Your name</label><div class="mock-input filled autofilled">Silke S. Dainese <span class="autofill-tag">ORCID</span></div></div>
+            <div class="field"><label>Institution</label><div class="mock-input filled autofilled">Aarhus University <span class="autofill-tag">ORCID</span></div></div>
+          </div>
+
+          <div class="section-label">Research description</div>
+          <div class="section-desc">Auto-generated from your 23 publications. Edit freely &mdash; the AI reads this daily to score papers.</div>
+          <div class="field"><div class="mock-textarea" id="research-desc" style="min-height:80px;color:var(--ash-black);font-style:normal;">I study stellar rotation and gyrochronology in open clusters, using photometric time-series data from Kepler, K2, and TESS. My focus is on calibrating the rotation&ndash;age relation for FGK dwarfs and understanding how magnetic braking shapes spin-down.</div></div>
+        </div>
+      </div>
+
+      <!-- No-ORCID manual fields (shown when skipping) -->
+      <div id="manual-profile" style="display:none;margin-top:12px;">
+        <div class="field-row">
+          <div class="field"><label>Your name</label><div class="mock-input">Your name...</div></div>
+          <div class="field"><label>Institution</label><div class="mock-input">University / lab...</div></div>
+        </div>
+        <div class="section-label">Research description</div>
+        <div class="section-desc">Describe your research like you'd tell a colleague. More specific = better AI scoring.</div>
+        <div class="field"><div class="mock-textarea" id="research-desc-manual" style="min-height:80px;">Write your research focus here...</div></div>
+      </div>
+
+      <!-- Advanced profile fields -->
+      <div style="margin-top:12px;">
+        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'advanced-profile')">Advanced profile settings &#x2193;</span>
+        <div id="advanced-profile" style="display:none;margin-top:8px;padding:12px;background:var(--ash-white);border:1px solid var(--card-border);border-radius:6px;">
+          <div class="field-row">
+            <div class="field"><label>Digest name</label><div class="mock-input filled">arXiv Digest</div><div class="note">Subject line</div></div>
+            <div class="field"><label>Department</label><div class="mock-input">Department...</div></div>
+          </div>
+          <div class="section-label" style="margin-top:8px;">Your name on arXiv</div>
+          <div class="section-desc">When you publish, the digest celebrates it!</div>
+          <div class="chip-group" id="arxiv-name-chips">
+            <span class="chip chip-ghost">+ add name variant</span>
+          </div>
+          <div class="field" style="margin-top:10px;"><label>Tagline (optional)</label><div class="mock-input">A motto for the email footer...</div><div class="note">e.g. "Ad astra per aspera"</div></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <button class="btn-primary" onclick="done('step-1');go('step-2')">Continue &rarr;</button>
+        <span id="skip-orcid-link" style="font-size:12px;color:var(--warm-grey);margin-left:12px;cursor:pointer;text-decoration:underline;" onclick="document.getElementById('manual-profile').style.display='block';this.style.display='none';">No ORCID? Fill manually &darr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 2. WHAT TO FOLLOW ═══ -->
+  <div class="step collapsed" id="step-2">
+    <div class="step-header" onclick="toggleStep('step-2')"><span class="step-num">2</span><span class="step-title">What to Follow</span><span class="step-summary" id="sum-step-2"></span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>Which arXiv categories to scan, and which topics to look for.</p>
+
+      <!-- Auto-fill button (single action: categories + keywords) -->
+      <div id="autofill-bar" style="background:var(--gold-wash);border:1px solid #e8d47a;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+        <div><div style="font-size:12px;font-weight:600;color:#8a6f00;">Auto-fill from publications</div><div style="font-size:11px;color:#a08520;margin-top:1px;">Suggests categories and keywords from your 23 papers.</div></div>
+        <button class="btn-secondary" style="border-color:#e8d47a;color:#8a6f00;white-space:nowrap;" onclick="autoFillAll()" id="autofill-btn">Auto-fill</button>
+      </div>
+      <div id="autofill-status" style="display:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--pine);margin-bottom:8px;"></div>
+
+      <!-- arXiv Categories -->
+      <div class="section-label">arXiv categories</div>
+      <div class="section-desc">Papers outside these categories are ignored.</div>
+
+      <div id="cat-container">
+        <div class="cat-expander" id="cat-astro">
+          <div class="cat-expander-header" onclick="toggleCat('cat-astro')"><span class="cat-expander-name">Astrophysics</span><div class="cat-expander-meta"><span class="cat-count" id="cat-astro-count">0/6</span><span class="cat-expander-chevron">&#x276F;</span></div></div>
+          <div class="cat-expander-body">
+            <div class="chip-group" id="cat-astro-chips"><span class="chip chip-ghost" style="font-style:normal;">astro-ph.SR</span><span class="chip chip-ghost" style="font-style:normal;">astro-ph.EP</span><span class="chip chip-ghost" style="font-style:normal;">astro-ph.GA</span><span class="chip chip-ghost" style="font-style:normal;">astro-ph.IM</span><span class="chip chip-ghost" style="font-style:normal;">astro-ph.CO</span><span class="chip chip-ghost" style="font-style:normal;">astro-ph.HE</span></div>
+            <div style="display:flex;gap:8px;margin-top:8px;"><button class="btn-clear">Select all</button><button class="btn-clear">Clear</button></div>
+          </div>
+        </div>
+        <div class="cat-expander" id="cat-physics"><div class="cat-expander-header" onclick="toggleCat('cat-physics')"><span class="cat-expander-name">Physics</span><div class="cat-expander-meta"><span class="cat-count">0/12</span><span class="cat-expander-chevron">&#x276F;</span></div></div><div class="cat-expander-body"><div class="chip-group"><span class="chip chip-ghost" style="font-style:normal;">hep-th</span><span class="chip chip-ghost" style="font-style:normal;">hep-ph</span><span class="chip chip-ghost" style="font-style:normal;">hep-ex</span><span class="chip chip-ghost" style="font-style:normal;">gr-qc</span><span class="chip chip-ghost" style="font-style:normal;">nucl-th</span><span class="chip chip-ghost" style="font-style:normal;">quant-ph</span></div></div></div>
+        <div class="cat-expander" id="cat-cs"><div class="cat-expander-header" onclick="toggleCat('cat-cs')"><span class="cat-expander-name">Computer Science</span><div class="cat-expander-meta"><span class="cat-count">0/40</span><span class="cat-expander-chevron">&#x276F;</span></div></div><div class="cat-expander-body"><div class="chip-group"><span class="chip chip-ghost" style="font-style:normal;">cs.AI</span><span class="chip chip-ghost" style="font-style:normal;">cs.LG</span><span class="chip chip-ghost" style="font-style:normal;">cs.CV</span><span class="chip chip-ghost" style="font-style:normal;">cs.CL</span></div></div></div>
+        <div class="cat-expander" id="cat-math"><div class="cat-expander-header" onclick="toggleCat('cat-math')"><span class="cat-expander-name">Mathematics</span><div class="cat-expander-meta"><span class="cat-count">0/32</span><span class="cat-expander-chevron">&#x276F;</span></div></div><div class="cat-expander-body"><div class="chip-group"><span class="chip chip-ghost" style="font-style:normal;">math.ST</span><span class="chip chip-ghost" style="font-style:normal;">math.NA</span></div></div></div>
+      </div>
+
+      <!-- Keywords as simple chips -->
+      <div class="section-label">Keywords</div>
+      <div class="section-desc">Topics your digest looks for. Each gets a default weight of 7 (main interest).</div>
+
+      <div id="kw-chips-view">
+        <div class="chip-group" id="kw-chips">
+          <span class="chip chip-ghost">+ add keyword</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+          <div class="mock-input" style="flex:3;padding:7px 12px;font-size:12px;">Add a keyword...</div>
+          <button class="btn-secondary" style="flex-shrink:0;padding:7px 14px;">Add</button>
+        </div>
+      </div>
+
+      <!-- Advanced keyword settings (hidden by default) -->
+      <div style="margin-top:10px;">
+        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'advanced-keywords')">Advanced keyword settings &#x2193;</span>
+        <div id="advanced-keywords" style="display:none;margin-top:8px;padding:12px;background:var(--ash-white);border:1px solid var(--card-border);border-radius:6px;">
+          <div class="section-desc" style="margin:0 0 6px;">Fine-tune weight (0&ndash;10) and set "Always" to force-include regardless of AI score.</div>
+          <table class="kw-table" id="kw-table">
+            <thead><tr><th>Keyword</th><th style="width:160px;">Weight</th><th style="width:50px;text-align:center;">Always</th><th style="width:24px;"></th></tr></thead>
+            <tbody id="kw-tbody">
+              <tr id="kw-empty-row"><td colspan="4" style="text-align:center;color:var(--warm-grey);font-style:italic;padding:16px;">No keywords yet. Add above or use Auto-fill.</td></tr>
+            </tbody>
+          </table>
+          <div class="note"><strong>0&ndash;2</strong> loosely follow &middot; <strong>3&ndash;5</strong> interested &middot; <strong>6&ndash;8</strong> main interest &middot; <strong>9&ndash;10</strong> everything</div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="done('step-2');go('step-3')" style="margin-top:14px;">Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ═══ 3. PEOPLE ═══ -->
+  <div class="step collapsed" id="step-3">
+    <div class="step-header" onclick="toggleStep('step-3')"><span class="step-num">3</span><span class="step-title">People to Follow</span><span class="step-summary" id="sum-step-3"></span><span class="step-badge">optional</span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>People whose papers you always want to see. Labmates, advisors, collaborators, researchers you follow.</p>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="chip-group" id="coll-chips" style="flex:1;">
+          <span class="chip chip-ghost">+ add person</span>
+        </div>
+        <button class="btn-clear" onclick="clearColleagues()" id="coll-clear-btn" style="margin-left:8px;display:none;">Clear</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button class="btn-secondary" onclick="aiSuggestPeople()" id="ai-suggest-people-btn">Suggest from co-authors</button>
+        <span id="ai-people-status" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--pine);display:none;"></span>
+      </div>
+
+      <!-- AI suggestions -->
+      <div id="ai-people-results" style="display:none;margin-top:8px;padding:10px 12px;background:var(--gold-wash);border:1px solid #e8d47a;border-radius:8px;">
+        <div style="font-size:11px;color:#8a6f00;margin-bottom:6px;font-weight:600;">Co-authors from your publications (14 found) &mdash; click to add</div>
+        <div class="chip-group">
+          <span class="chip chip-gold" style="cursor:pointer;">C. Advisor (8 papers)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">B. Labmate (5)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">A. Colleague (5)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">D. Postdoc (4)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">E. Student (4)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">F. Visitor (3)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">Barnes, S (7)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">Meibom, S (5)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">Curtis, J (4)</span>
+          <span class="chip chip-gold" style="cursor:pointer;">Douglas, S (3)</span>
+        </div>
+        <div class="section-desc" style="margin-top:8px;cursor:pointer;color:var(--pine);text-decoration:underline;" onclick="var o=this.nextElementSibling.style.display==='none';this.nextElementSibling.style.display=o?'block':'none';this.textContent=o?'Show fewer \u2191':'Show all 14 \u2193'">Show all 14 &#x2193;</div>
+        <div style="display:none;">
+          <div class="chip-group" style="margin-top:4px;">
+            <span class="chip chip-gold" style="cursor:pointer;">Ag&uuml;eros, M (3)</span>
+            <span class="chip chip-gold" style="cursor:pointer;">Van Saders, J (3)</span>
+            <span class="chip chip-gold" style="cursor:pointer;">Bouma, L (2)</span>
+            <span class="chip chip-gold" style="cursor:pointer;">Gruner, D (1)</span>
+          </div>
+        </div>
+        <div style="margin-top:6px;"><button class="btn-clear" onclick="document.getElementById('ai-people-results').style.display='none'">Hide suggestions</button></div>
+      </div>
+
+      <div class="explainer" style="margin-top:12px;">
+        Everyone you add gets their own section in the digest, even if their papers are off-topic for you.
+      </div>
+
+      <!-- Advanced: reclassify -->
+      <div style="margin-top:8px;">
+        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'advanced-people')">Advanced: colleague vs. research author &#x2193;</span>
+        <div id="advanced-people" style="display:none;margin-top:8px;padding:12px;background:var(--ash-white);border:1px solid var(--card-border);border-radius:6px;">
+          <div class="section-desc" style="margin:0 0 8px;">By default, everyone is a <strong>colleague</strong> (always shown). Reclassify as <strong>research author</strong> to give a scoring boost instead &mdash; they may be filtered if too off-topic.</div>
+          <div style="font-size:12px;color:var(--warm-grey);font-style:italic;">Add people above first, then reclassify here.</div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="done('step-3');go('step-4')" style="margin-top:14px;">Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ═══ 4. DELIVERY ═══ -->
+  <div class="step collapsed" id="step-4">
+    <div class="step-header" onclick="toggleStep('step-4')"><span class="step-num">4</span><span class="step-title">Delivery &amp; Download</span><span class="step-summary" id="sum-step-4"></span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>How your digest is delivered. Smart defaults &mdash; most people just download here.</p>
+
+      <!-- Frequency as editable text -->
+      <div class="section-label">Schedule</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="font-size:13px;">Your digest arrives <strong id="freq-label">Mon, Wed, Fri</strong>.</div>
+        <span style="font-size:12px;color:var(--pine);cursor:pointer;text-decoration:underline;" onclick="document.getElementById('freq-picker').style.display=document.getElementById('freq-picker').style.display==='none'?'block':'none'">Change &rarr;</span>
+      </div>
+      <div id="freq-picker" style="display:none;margin-bottom:10px;">
+        <div class="radio-group">
+          <div class="radio-option active" onclick="pickFreq(this,'Mon, Wed, Fri')"><div class="radio-title">Mon / Wed / Fri</div><div class="radio-desc">Best balance.</div></div>
+          <div class="radio-option" onclick="pickFreq(this,'every weekday')"><div class="radio-title">Every weekday</div><div class="radio-desc">Never miss a day.</div></div>
+          <div class="radio-option" onclick="pickFreq(this,'Mondays')"><div class="radio-title">Weekly</div><div class="radio-desc">Monday round-up.</div></div>
+        </div>
+      </div>
+
+      <!-- Digest size -->
+      <div class="section-label">Digest size</div>
+      <div class="radio-group">
+        <div class="radio-option active" onclick="setRadio(this)"><div class="radio-title">Highlights</div><div class="radio-desc">Top papers only (up to 6). For busy people.</div></div>
+        <div class="radio-option" onclick="setRadio(this)"><div class="radio-title">In-depth</div><div class="radio-desc">Wider net (up to 15). For browsers.</div></div>
+      </div>
+
+      <!-- Customize card layout (collapsed) -->
+      <div style="margin-top:14px;">
+        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'card-customize')">Customize card layout &#x2193;</span>
+        <div id="card-customize" style="display:none;margin-top:8px;padding:12px;background:var(--ash-white);border:1px solid var(--card-border);border-radius:6px;">
+          <div class="section-desc" style="margin:0 0 8px;">How each paper looks in the email. Default includes summary, why chosen, score, and tags.</div>
+          <div class="radio-group" style="margin-bottom:10px;">
+            <div class="radio-option active" onclick="setPreset(this,'default')"><div class="radio-title">Default</div><div class="radio-desc">Summary, why, score, tags.</div></div>
+            <div class="radio-option" onclick="setPreset(this,'minimal')"><div class="radio-title">Minimal</div><div class="radio-desc">Title + one-line.</div></div>
+            <div class="radio-option" onclick="setPreset(this,'full')"><div class="radio-title">Full</div><div class="radio-desc">Everything.</div></div>
+          </div>
+
+          <div class="section-desc" style="margin:8px 0 4px;">Toggle &amp; reorder card elements:</div>
+          <div class="card-order-item" style="margin-bottom:4px;">
+            <span class="order-toggle" id="score-toggle" onclick="toggleScoreBadge()">&#x2713;</span>
+            <span class="order-label">Score badge</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--warm-grey);">top bar</span>
+          </div>
+          <ul class="card-order-list" id="card-order-list">
+            <li class="card-order-item" data-el="summary"><span class="order-toggle" onclick="toggleOrderItem(this.parentElement)">&#x2713;</span><span class="order-label">AI summary</span><span class="order-arrows"><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),-1)">&#x25B2;</span><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),1)">&#x25BC;</span></span></li>
+            <li class="card-order-item" data-el="why"><span class="order-toggle" onclick="toggleOrderItem(this.parentElement)">&#x2713;</span><span class="order-label">Why chosen</span><span class="order-arrows"><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),-1)">&#x25B2;</span><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),1)">&#x25BC;</span></span></li>
+            <li class="card-order-item" data-el="tags"><span class="order-toggle" onclick="toggleOrderItem(this.parentElement)">&#x2713;</span><span class="order-label">Keyword tags</span><span class="order-arrows"><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),-1)">&#x25B2;</span><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),1)">&#x25BC;</span></span></li>
+            <li class="card-order-item off" data-el="finding"><span class="order-toggle" onclick="toggleOrderItem(this.parentElement)">&#x2713;</span><span class="order-label">Key finding</span><span class="order-arrows"><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),-1)">&#x25B2;</span><span class="order-arrow" onclick="moveOrderItem(this.closest('li'),1)">&#x25BC;</span></span></li>
+          </ul>
+
+          <!-- Card preview -->
+          <div class="section-label">Preview</div>
+          <div class="email-card">
+            <div class="email-card-topbar">
+              <span class="email-card-title">Gyrochronology of the Hyades: New Rotation Periods from TESS</span>
+              <span class="email-card-score" id="ep-score">8/10</span>
+            </div>
+            <div class="email-card-authors">Douglas et al. &middot; 2026-03-14 &middot; astro-ph.SR</div>
+            <div class="email-card-body">
+              <div class="email-card-section" id="ep-summary"><div class="email-card-label">Summary</div><div>New rotation periods for 127 Hyades members from TESS, showing slowly rotating stars spin down faster than standard gyrochronology models predict.</div></div>
+              <div class="email-card-section" id="ep-finding" style="display:none;"><div class="email-card-label">Key finding</div><div>Slowly rotating Hyades stars spin down 20% faster than Skumanich predictions.</div></div>
+              <div class="email-card-section" id="ep-why"><div class="email-card-label">Why chosen</div><div>Matches: gyrochronology (9), rotation period (8), open clusters (8)</div></div>
+              <div class="email-card-tags" id="ep-tags">
+                <span class="ep-tag">gyrochronology<span class="tag-arrows"><span class="tag-arrow">&#x25B2;</span><span class="tag-arrow">&#x25BC;</span></span></span>
+                <span class="ep-tag">rotation<span class="tag-arrows"><span class="tag-arrow">&#x25B2;</span><span class="tag-arrow">&#x25BC;</span></span></span>
+                <span class="ep-tag">TESS<span class="tag-arrows"><span class="tag-arrow">&#x25B2;</span><span class="tag-arrow">&#x25BC;</span></span></span>
+                <span class="ep-tag">open clusters<span class="tag-arrows"><span class="tag-arrow">&#x25B2;</span><span class="tag-arrow">&#x25BC;</span></span></span>
+              </div>
+              <div>
+                <span class="abstract-toggle" onclick="this.nextElementSibling.classList.toggle('show');this.textContent=this.nextElementSibling.classList.contains('show')?'Hide abstract \u25B2':'Show abstract \u25BC'">Show abstract &#x25BC;</span>
+                <div class="abstract-content">We present rotation periods for 127 members of the Hyades open cluster (age ~650 Myr) derived from TESS Sectors 42-44 full-frame images...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Self-hosting options (collapsed) -->
+      <div style="margin-top:8px;">
+        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'selfhost-options')">Self-hosting options &#x2193;</span>
+        <div id="selfhost-options" style="display:none;margin-top:8px;padding:12px;background:var(--ash-white);border:1px solid var(--card-border);border-radius:6px;">
+          <div class="section-desc" style="margin:0 0 8px;">Only relevant if you're running your own email. Most users can skip this.</div>
+          <div class="field-row">
+            <div class="field"><label>Email provider</label>
+              <div class="radio-group" style="margin:4px 0 0;"><div class="radio-option active" onclick="setRadio(this)" style="padding:8px;"><div style="font-weight:600;font-size:12px;">Gmail</div></div><div class="radio-option" onclick="setRadio(this)" style="padding:8px;"><div style="font-weight:600;font-size:12px;">Outlook</div></div></div>
+            </div>
+            <div class="field"><label>Send time (UTC)</label><div class="mock-input filled" style="text-align:center;">07:00</div><div class="note">When it lands in your inbox.</div></div>
+          </div>
+          <div class="field-row" style="margin-top:8px;">
+            <div class="field"><label>Min score (1&ndash;10)</label><div class="mock-input filled" style="text-align:center;">5</div><div class="note">Papers below this are dropped. Set by Digest size above.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Download -->
+      <hr class="divider" style="margin-top:16px;">
+      <div class="download-area">
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;margin-bottom:4px;">Your config is ready</div>
+        <div style="font-size:12px;color:var(--warm-grey);margin-bottom:4px;">5 categories &middot; 5 keywords &middot; 10 people</div>
+        <div style="font-size:11px;color:var(--warm-grey);margin-bottom:12px;" id="researcher-summary">Highlights &middot; Default card &middot; Mon/Wed/Fri</div>
+        <button class="download-btn" onclick="downloadConfig()">Download config.yaml</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next steps -->
+  <hr class="divider" style="margin-top:24px;">
+  <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--warm-grey);margin:20px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--card-border);">After setup</div>
+
+  <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+    <span class="step-num" style="width:22px;height:22px;font-size:11px;">1</span>
+    <div><div style="font-size:13px;font-weight:600;">Fork the repo</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;"><a href="#" style="color:var(--pine);">SilkeDainese/arxiv-digest</a> &rarr; Fork</div></div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+    <span class="step-num" style="width:22px;height:22px;font-size:11px;">2</span>
+    <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Add file &rarr; Upload &rarr; drop config.yaml &rarr; Commit.</div></div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:4px;align-items:flex-start;">
+    <span class="step-num" style="width:22px;height:22px;font-size:11px;">3</span>
+    <div style="flex:1;">
+      <div style="font-size:13px;font-weight:600;">Add secrets</div>
+      <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Settings &rarr; Secrets &rarr; Actions</div>
+    </div>
+  </div>
+
+  <div style="margin:4px 0 12px 32px;border:1px solid var(--card-border);border-radius:8px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--ash-white);border-bottom:1px solid var(--card-border);">
+          <th style="text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--warm-grey);">Secret name</th>
+          <th style="text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--warm-grey);">Value</th>
+          <th style="text-align:center;padding:8px 10px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--warm-grey);width:70px;">Required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--card-border);">
+          <td style="padding:8px 10px;"><code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">RECIPIENT_EMAIL</code></td>
+          <td style="padding:8px 10px;color:var(--warm-grey);">Your email address</td>
+          <td style="text-align:center;padding:8px 10px;color:var(--pine);font-weight:600;">Yes</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--card-border);background:var(--gold-wash);">
+          <td colspan="3" style="padding:6px 10px;font-size:11px;color:#8a6f00;font-weight:600;">Email delivery &mdash; pick one:</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--card-border);">
+          <td style="padding:8px 10px;"><code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">RELAY_TOKEN</code></td>
+          <td style="padding:8px 10px;color:var(--warm-grey);">From access code &mdash; no email setup needed</td>
+          <td style="text-align:center;padding:8px 10px;font-size:11px;color:var(--warm-grey);">Option A</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--card-border);">
+          <td style="padding:8px 10px;">
+            <code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">SMTP_USER</code><br>
+            <code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;margin-top:2px;display:inline-block;">SMTP_PASSWORD</code>
+          </td>
+          <td style="padding:8px 10px;color:var(--warm-grey);">Gmail/Outlook + <a href="#" style="color:var(--pine);">App Password</a></td>
+          <td style="text-align:center;padding:8px 10px;font-size:11px;color:var(--warm-grey);">Option B</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--card-border);background:var(--gold-wash);">
+          <td colspan="3" style="padding:6px 10px;font-size:11px;color:#8a6f00;font-weight:600;">AI scoring &mdash; optional:</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--card-border);">
+          <td style="padding:8px 10px;"><code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">GEMINI_API_KEY</code></td>
+          <td style="padding:8px 10px;color:var(--warm-grey);"><a href="#" style="color:var(--pine);">Free key &rarr;</a> aistudio.google.com</td>
+          <td style="text-align:center;padding:8px 10px;font-size:11px;color:var(--warm-grey);">Free</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px;"><code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">ANTHROPIC_API_KEY</code></td>
+          <td style="padding:8px 10px;color:var(--warm-grey);"><a href="#" style="color:var(--pine);">console.anthropic.com</a></td>
+          <td style="text-align:center;padding:8px 10px;font-size:11px;color:var(--warm-grey);">Paid</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+    <span class="step-num" style="width:22px;height:22px;font-size:11px;">4</span>
+    <div><div style="font-size:13px;font-weight:600;">Allow Actions &amp; run workflow</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Actions tab &rarr; Enable workflows &rarr; Run workflow.</div></div>
+  </div>
+</div>
+
+</div><!-- end flow-researcher -->
+
+<!-- ═══════ MINI FLOW ═══════ -->
+<div class="mode-flow" id="flow-mini">
+<div class="main">
+
+  <!-- M1. Keywords -->
+  <div class="step" id="mini-1">
+    <div class="step-header" onclick="toggleStep('mini-1')"><span class="step-num">1</span><span class="step-title">Keywords &amp; Interests</span><span class="step-summary" id="sum-mini-1"></span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>What topics should your digest cover? Add keywords and set how important each one is.</p>
+
+      <div class="section-label">Your keywords</div>
+      <div class="section-desc">Add any terms you're interested in. Score from 0 (slight interest) to 10 (main interest). Check "Always" to never miss papers on that topic.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;">
+        <thead><tr style="border-bottom:2px solid var(--card-border);">
+          <th style="text-align:left;padding:6px 8px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--warm-grey);">Keyword</th>
+          <th style="text-align:center;padding:6px 4px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--warm-grey);width:80px;">Weight</th>
+          <th style="text-align:center;padding:6px 4px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--warm-grey);width:55px;">Always</th>
+          <th style="width:24px;"></th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--card-border);"><td style="padding:6px 8px;">machine learning</td><td style="text-align:center;"><span class="tag-arrow" style="cursor:pointer;">&#x25B2;</span> <strong>8</strong> <span class="tag-arrow" style="cursor:pointer;">&#x25BC;</span></td><td style="text-align:center;"><input type="checkbox"></td><td><span class="remove" style="cursor:pointer;">&times;</span></td></tr>
+          <tr style="border-bottom:1px solid var(--card-border);"><td style="padding:6px 8px;">exoplanets</td><td style="text-align:center;"><span class="tag-arrow" style="cursor:pointer;">&#x25B2;</span> <strong>6</strong> <span class="tag-arrow" style="cursor:pointer;">&#x25BC;</span></td><td style="text-align:center;"><input type="checkbox"></td><td><span class="remove" style="cursor:pointer;">&times;</span></td></tr>
+          <tr style="border-bottom:1px solid var(--card-border);background:var(--ash-white);"><td colspan="4" style="padding:6px 8px;"><span class="chip-ghost" style="display:inline-block;">+ add keyword</span></td></tr>
+        </tbody>
+      </table>
+      <div class="note">0 = slight interest &middot; 5 = moderate &middot; 10 = main interest &middot; Always = show every matching paper</div>
+
+      <button class="btn-primary" onclick="done('mini-1');go('mini-2')" style="margin-top:14px;">Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- M2. Colleagues -->
+  <div class="step collapsed" id="mini-2">
+    <div class="step-header" onclick="toggleStep('mini-2')"><span class="step-num">2</span><span class="step-title">Colleagues</span><span class="step-summary" id="sum-mini-2"></span><span class="step-badge">optional</span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>People whose papers you always want to see, regardless of topic. Labmates, advisors, collaborators.</p>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="chip-group" style="flex:1;">
+          <span class="chip chip-ghost">+ add colleague</span>
+        </div>
+        <button class="btn-clear" style="margin-left:8px;display:none;">Clear</button>
+      </div>
+
+      <div class="explainer" style="margin-top:12px;">
+        <strong>Colleagues</strong> always get their own section in the email, even if their latest paper is off-topic for you.
+      </div>
+
+      <button class="btn-primary" onclick="done('mini-2');go('mini-3')" style="margin-top:14px;">Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- M3. Schedule & Download -->
+  <div class="step collapsed" id="mini-3">
+    <div class="step-header" onclick="toggleStep('mini-3')"><span class="step-num">3</span><span class="step-title">Schedule &amp; Download</span><span class="step-summary" id="sum-mini-3"></span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>How many papers and how often. Send time is randomised to spread load.</p>
+
+      <div class="section-label">Digest size</div>
+      <div class="section-desc">Controls the volume of each email.</div>
+      <div class="radio-group">
+        <div class="radio-option active" onclick="setRadio(this)"><div class="radio-title">Highlights</div><div class="radio-desc">Top papers only (up to 6). For busy people.</div></div>
+        <div class="radio-option" onclick="setRadio(this)"><div class="radio-title">In-depth</div><div class="radio-desc">Wider net (up to 15). For browsers who want more coverage.</div></div>
+      </div>
+
+      <div class="section-label">How often?</div>
+      <div class="section-desc">More frequent = smaller digests.</div>
+      <div class="radio-group">
+        <div class="radio-option active" onclick="setRadio(this)"><div class="radio-title">Mon / Wed / Fri</div><div class="radio-desc">Best balance.</div></div>
+        <div class="radio-option" onclick="setRadio(this)"><div class="radio-title">Every weekday</div><div class="radio-desc">Never miss a day.</div></div>
+        <div class="radio-option" onclick="setRadio(this)"><div class="radio-title">Weekly</div><div class="radio-desc">Monday round-up.</div></div>
+      </div>
+
+      <div class="explainer" style="margin-top:8px;">
+        <strong>Send time</strong> is assigned randomly (between 06:00–09:00 UTC) to avoid everyone hitting the arXiv API at once.
+      </div>
+
+      <div class="download-area" style="margin-top:16px;">
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;margin-bottom:4px;">Your config is ready</div>
+        <div style="font-size:12px;color:var(--warm-grey);margin-bottom:4px;">2 keywords &middot; 0 colleagues</div>
+        <div style="font-size:11px;color:var(--warm-grey);margin-bottom:12px;" id="mini-summary">Highlights &middot; Mon/Wed/Fri &middot; Random send time</div>
+        <button class="download-btn" onclick="downloadMiniConfig()">Download config.yaml</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next steps (mini) -->
+  <hr class="divider" style="margin-top:24px;">
+  <div style="margin-top:16px;">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--warm-grey);margin:0 0 12px;padding-bottom:4px;border-bottom:1px solid var(--card-border);">After setup</div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+      <span class="step-num" style="width:22px;height:22px;font-size:11px;">1</span>
+      <div><div style="font-size:13px;font-weight:600;">Fork the repo</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;"><a href="#" style="color:var(--pine);">SilkeDainese/arxiv-digest</a> &rarr; Fork</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+      <span class="step-num" style="width:22px;height:22px;font-size:11px;">2</span>
+      <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Add file &rarr; Upload. Come back and re-run setup anytime.</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+      <span class="step-num" style="width:22px;height:22px;font-size:11px;">3</span>
+      <div><div style="font-size:13px;font-weight:600;">Add secrets</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Settings &rarr; Secrets &rarr; Actions. Email creds or relay token.</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
+      <span class="step-num" style="width:22px;height:22px;font-size:11px;">4</span>
+      <div><div style="font-size:13px;font-weight:600;">Allow Actions &amp; run workflow</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">Actions tab &rarr; Enable workflows &rarr; Run workflow.</div></div>
+    </div>
+  </div>
+
+</div>
+</div><!-- end flow-mini -->
+
+<!-- ═══════ AU STUDENT FLOW ═══════ -->
+<div class="mode-flow" id="flow-student">
+<div class="main">
+
+  <div class="step" style="border-color:var(--pine);margin-top:12px;background:var(--pine-wash);">
+    <div style="padding:14px 18px;">
+      <div style="font-family:'DM Serif Display',Georgia,serif;font-size:15px;color:var(--pine);margin-bottom:4px;">Aarhus University &mdash; Student Digest</div>
+      <div style="font-size:12px;color:var(--warm-grey);line-height:1.5;">AI scoring and email relay provided courtesy. You just need an AU email and to set a password.</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--pine-light);margin-top:6px;opacity:.7;">relay: arxiv-digest-relay.vercel.app/api/students</div>
+    </div>
+  </div>
+
+  <!-- S1. AU Account -->
+  <div class="step" id="stu-1">
+    <div class="step-header" onclick="toggleStep('stu-1')"><span class="step-num">1</span><span class="step-title">Your AU Account</span><span class="step-summary" id="sum-stu-1"></span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>Log in or create your student subscription. Only <strong>@uni.au.dk</strong> emails are accepted.</p>
+
+      <div class="field" style="margin-bottom:10px;">
+        <label>AU email</label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input class="ai-key-input" id="stu-email" placeholder="au612345" style="width:120px;border-radius:6px;" oninput="validateStudentEmail()">
+          <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--warm-grey);">@uni.au.dk</span>
+        </div>
+        <div class="email-validation">
+          <span class="status" id="stu-email-status"></span>
+        </div>
+        <div class="note">Format: au + 6 digits (e.g. au612345@uni.au.dk)</div>
+      </div>
+
+      <div class="password-row">
+        <div class="field">
+          <label>Password</label>
+          <input class="ai-key-input" type="password" id="stu-pass" placeholder="choose a password" style="border-radius:6px;" oninput="checkStudentPass()">
+          <div class="password-strength" id="stu-pass-strength"></div>
+        </div>
+        <div class="field">
+          <label>Confirm</label>
+          <input class="ai-key-input" type="password" id="stu-pass2" placeholder="repeat" style="border-radius:6px;" oninput="checkStudentPass()">
+        </div>
+      </div>
+      <div class="note" style="margin-bottom:8px;">This is a digest-only password, not your AU login. Pick something simple you'll remember.</div>
+
+      <button class="btn-primary" onclick="stuValidateStep1()" id="stu-continue-1" style="margin-top:10px;">Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- S2. Interests -->
+  <div class="step collapsed" id="stu-2">
+    <div class="step-header" onclick="toggleStep('stu-2')"><span class="step-num">2</span><span class="step-title">Your Interests</span><span class="step-summary" id="sum-stu-2"></span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>Pick the topic packages you want in your daily digest. Select at least one.</p>
+
+      <div class="package-grid">
+        <div class="package-card selected" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Stars &amp; Stellar</div>
+          <div class="pkg-desc">Stellar evolution, atmospheres, rotation, binaries, variable stars.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Exoplanets</div>
+          <div class="pkg-desc">Detection, characterisation, atmospheres, habitability, planetary systems.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Galaxies</div>
+          <div class="pkg-desc">Galaxy formation, evolution, morphology, AGN, groups &amp; clusters.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Cosmology</div>
+          <div class="pkg-desc">CMB, dark energy, large-scale structure, early universe, inflation.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Instrumentation</div>
+          <div class="pkg-desc">Telescopes, detectors, pipelines, data reduction, surveys.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">High Energy</div>
+          <div class="pkg-desc">X-ray, gamma-ray, compact objects, supernovae, GRBs, neutrinos.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Solar &amp; Helio</div>
+          <div class="pkg-desc">Solar physics, heliospheric science, space weather, asteroseismology.</div>
+        </div>
+        <div class="package-card" onclick="togglePkg(this)">
+          <span class="pkg-check">&#x2713;</span>
+          <div class="pkg-name">Methods &amp; ML</div>
+          <div class="pkg-desc">Statistical methods, machine learning, data science for astronomy.</div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="stuValidateStep2()" style="margin-top:14px;">Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- S3. Settings & Subscribe -->
+  <div class="step collapsed" id="stu-3">
+    <div class="step-header" onclick="toggleStep('stu-3')"><span class="step-num">3</span><span class="step-title">Settings &amp; Subscribe</span><span class="step-chevron">&#x276F;</span></div>
+    <div class="step-body">
+      <p>Choose how many papers per digest, then subscribe.</p>
+
+      <div class="section-label">Frequency</div>
+      <div style="padding:10px 12px;background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;font-size:13px;color:var(--pine);">
+        <strong>Weekly</strong> &mdash; Monday round-up
+        <div style="font-size:11px;color:var(--warm-grey);margin-top:2px;">Student digests are sent once a week to keep things manageable.</div>
+      </div>
+
+      <div class="section-label" style="margin-top:14px;">How many papers?</div>
+      <div class="radio-group">
+        <div class="radio-option active" onclick="setRadio(this)"><div class="radio-title">Highlights (6)</div><div class="radio-desc">Top picks only. Quick read.</div></div>
+        <div class="radio-option" onclick="setRadio(this)"><div class="radio-title">In-depth (15)</div><div class="radio-desc">Broader coverage across your topics.</div></div>
+      </div>
+
+      <div class="download-area" style="margin-top:16px;">
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;margin-bottom:4px;">Ready to subscribe</div>
+        <div style="font-size:12px;color:var(--warm-grey);margin-bottom:4px;" id="stu-summary">au612345@uni.au.dk &middot; 1 package &middot; Weekly &middot; Highlights</div>
+        <div style="font-size:11px;color:var(--warm-grey);margin-bottom:12px;">AI scoring &amp; email relay provided by your instructor. No API key needed.</div>
+        <button class="download-btn" onclick="stuSubscribe()" id="stu-subscribe-btn">Subscribe</button>
+        <div id="stu-subscribe-status" style="margin-top:10px;font-family:'DM Mono',monospace;font-size:12px;display:none;"></div>
+      </div>
+
+      <div class="explainer" style="margin-top:14px;">
+        <strong>What happens next?</strong><br>
+        A confirmation email is sent to your AU address. Digests start the next scheduled day. You can update your interests or unsubscribe anytime by coming back here.
+      </div>
+    </div>
+  </div>
+
+</div>
+</div><!-- end flow-student -->
+
+<!-- Upload config overlay -->
+<div class="upload-overlay" id="upload-overlay" onclick="if(event.target===this)closeUpload()">
+  <div class="upload-box">
+    <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;margin-bottom:4px;">Upload your config.yaml</div>
+    <div style="font-size:12px;color:var(--warm-grey);line-height:1.5;">Already have a config? Upload it to edit your settings. Your current choices will be replaced.</div>
+    <div class="upload-dropzone" id="upload-dropzone" onclick="document.getElementById('upload-file').click()">
+      <div style="font-size:24px;color:var(--card-border);margin-bottom:6px;">&#x21E7;</div>
+      <div style="font-size:13px;color:var(--warm-grey);">Drop config.yaml here or click to browse</div>
+      <input type="file" id="upload-file" accept=".yaml,.yml" style="display:none;" onchange="handleUpload(this)">
+    </div>
+    <div id="upload-status" style="font-family:'DM Mono',monospace;font-size:12px;margin-top:8px;display:none;"></div>
+    <button class="btn-clear" onclick="closeUpload()" style="margin-top:8px;">Cancel</button>
+  </div>
+</div>
+
+<div class="app-footer">Built by <a href="#">Silke S. Dainese</a> &middot; dainese@phys.au.dk</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   arXiv Digest Setup — Client-side logic
+   All API calls go to the Flask backend at /api/...
+   ═══════════════════════════════════════════════════════════ */
+
+// ── State ──
+const state = {
+  geminiKey: '',
+  anthropicKey: '',
+  relayToken: '',
+  orcidData: null,  // cached ORCID response
+  selectedCats: [],
+  keywords: {},
+  colleagues: [],
+  researchAuthors: [],
+};
+
+function getAIKeys() {
+  return { gemini_key: state.geminiKey, anthropic_key: state.anthropicKey };
+}
+
+// ── Access code ──
+function openAccess(){document.getElementById('access-btn').style.display='none';document.getElementById('access-expanded').classList.add('show');document.getElementById('access-input').focus();}
+function closeAccess(){document.getElementById('access-expanded').classList.remove('show');document.getElementById('access-btn').style.display='';document.getElementById('access-status').style.display='none';}
+
+async function submitAccess(){
+  const code = document.getElementById('access-input').value.trim();
+  const s = document.getElementById('access-status');
+  document.getElementById('access-expanded').classList.remove('show');
+  document.getElementById('access-btn').style.display='none';
+
+  try {
+    const resp = await fetch('/api/invite/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code}),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      if (data.gemini_key) state.geminiKey = data.gemini_key;
+      if (data.anthropic_key) state.anthropicKey = data.anthropic_key;
+      if (data.relay_token) state.relayToken = data.relay_token;
+      s.className = 'access-status approved';
+      s.textContent = 'Approved \u2014 got ' + data.unlocked.join(' + ');
+      s.style.display = 'inline-block';
+    } else {
+      s.className = 'access-status denied';
+      s.textContent = data.error || 'Not recognised';
+      s.style.display = 'inline-block';
+      setTimeout(() => { s.style.display = 'none'; document.getElementById('access-btn').style.display = ''; }, 4000);
+    }
+  } catch(e) {
+    s.className = 'access-status denied';
+    s.textContent = 'Connection error';
+    s.style.display = 'inline-block';
+    setTimeout(() => { s.style.display = 'none'; document.getElementById('access-btn').style.display = ''; }, 4000);
+  }
+}
+document.getElementById('access-input').addEventListener('keydown', e => { if(e.key==='Enter') submitAccess(); if(e.key==='Escape') closeAccess(); });
+
+// ── Mode switching ──
+function setMode(el){
+  document.querySelectorAll('.mode-option').forEach(m => m.classList.remove('active'));
+  el.classList.add('active');
+  const modes = ['researcher','mini','student'];
+  const idx = [...el.parentElement.children].indexOf(el);
+  modes.forEach((m,i) => {
+    document.getElementById('flow-'+m).classList.toggle('active', i===idx);
+  });
+}
+
+// ── AI toggle ──
+function toggleAI(){
+  const on = document.getElementById('ai-toggle').checked;
+  document.querySelectorAll('.ai-foldout').forEach(f => f.classList.toggle('disabled',!on));
+  document.getElementById('ai-key-row').classList.toggle('show', on);
+  const ab = document.getElementById('autofill-bar');
+  if(ab){ ab.style.opacity = on ? '1' : '.4'; ab.style.pointerEvents = on ? '' : 'none'; }
+  const sp = document.getElementById('ai-suggest-people-btn');
+  if(sp){ sp.style.opacity = on ? '1' : '.5'; sp.disabled = !on; }
+
+  // Validate key if toggled on
+  if(on) validateAIKey();
+}
+
+async function validateAIKey(){
+  const gk = document.getElementById('gemini-key').value.trim();
+  const ak = document.getElementById('anthropic-key').value.trim();
+  if(!gk && !ak) return;
+
+  const s = document.getElementById('ai-key-status');
+  s.style.display = 'inline-block';
+  s.textContent = 'Checking...';
+  s.className = 'ai-key-status';
+
+  try {
+    const resp = await fetch('/api/ai/test-key', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({gemini_key: gk, anthropic_key: ak}),
+    });
+    const data = await resp.json();
+    if(data.ok) {
+      state.geminiKey = gk; state.anthropicKey = ak;
+      s.className = 'ai-key-status ok';
+      s.textContent = 'Ready \u2014 ' + data.provider;
+    } else {
+      s.className = 'ai-key-status err';
+      s.textContent = data.error || 'Key failed';
+    }
+  } catch(e) {
+    s.className = 'ai-key-status err';
+    s.textContent = 'Connection error';
+  }
+}
+
+// Validate on blur so user doesn't have to click anything
+document.getElementById('gemini-key')?.addEventListener('blur', validateAIKey);
+document.getElementById('anthropic-key')?.addEventListener('blur', validateAIKey);
+
+// ── Step navigation ──
+function toggleStep(id){ document.getElementById(id).classList.toggle('collapsed'); }
+
+function go(id){
+  document.querySelectorAll('.step').forEach(s => { if(s.id !== id) s.classList.add('collapsed'); });
+  const el = document.getElementById(id);
+  el.classList.remove('collapsed');
+  setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+}
+
+function done(id){
+  document.getElementById(id).classList.add('completed','collapsed');
+  updateStepSummary(id);
+}
+
+function updateStepSummary(id){
+  const sum = document.getElementById('sum-'+id);
+  if(!sum) return;
+  const d = state.orcidData;
+  const summaries = {
+    'step-1': d ? `${d.name} \u00b7 ${d.institution || 'unknown'}` : 'Manual entry',
+    'step-2': `${state.selectedCats.length} categories \u00b7 ${Object.keys(state.keywords).length} keywords`,
+    'step-3': `${state.colleagues.length + state.researchAuthors.length} people`,
+    'step-4': getDeliveryLabel(),
+    'mini-1': `${Object.keys(state.keywords).length} keywords`,
+    'mini-2': `${state.colleagues.length} colleagues`,
+    'mini-3': getDeliveryLabel(),
+    'stu-1': document.getElementById('stu-email')?.value ? document.getElementById('stu-email').value.trim() + '@uni.au.dk' : '',
+    'stu-2': document.querySelectorAll('#flow-student .package-card.selected').length + ' packages',
+  };
+  sum.textContent = summaries[id] || '';
+}
+
+function getDeliveryLabel(){
+  const freq = document.getElementById('freq-label')?.textContent || 'Mon, Wed, Fri';
+  const mode = document.querySelector('#step-4 .radio-group .radio-option.active .radio-title, #mini-3 .radio-group .radio-option.active .radio-title');
+  return (mode?.textContent || 'Highlights') + ' \u00b7 ' + freq;
+}
+
+// ── ORCID lookup (real API) ──
+async function simulateOrcidV2(){
+  let orcidId = document.getElementById('orcid-input')?.value?.trim() || '';
+  if(!orcidId) { document.getElementById('orcid-input')?.focus(); return; }
+
+  const btn = document.querySelector('#step-1 .btn-secondary');
+  if(btn){ btn.textContent = 'Looking up...'; btn.style.opacity = '.6'; }
+
+  try {
+    const resp = await fetch('/api/orcid/lookup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ orcid_id: orcidId, ...getAIKeys() }),
+    });
+    const data = await resp.json();
+    if(data.error) { alert(data.error); if(btn){ btn.textContent = 'Look up'; btn.style.opacity = '1'; } return; }
+
+    state.orcidData = data;
+    state.keywords = data.keywords || {};
+
+    // Fill the UI
+    document.getElementById('orcid-result').style.display = 'block';
+    document.getElementById('manual-profile').style.display = 'none';
+    document.getElementById('skip-orcid-link').style.display = 'none';
+
+    // Update found card
+    const foundCard = document.querySelector('#orcid-result > div > div > div:first-child');
+    if(foundCard) {
+      foundCard.innerHTML = `<div style="font-size:13px;font-weight:600;color:var(--pine);">Found: ${data.name}</div>`
+        + `<div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">${data.institution || ''} &middot; ${data.paper_count} papers &middot; ${data.coauthor_count} co-authors</div>`;
+    }
+
+    // Fill name + institution fields
+    const nameField = document.querySelector('#orcid-result .mock-input.autofilled');
+    if(nameField) nameField.innerHTML = `${data.name} <span class="autofill-tag">ORCID</span>`;
+    const instFields = document.querySelectorAll('#orcid-result .mock-input.autofilled');
+    if(instFields[1]) instFields[1].innerHTML = `${data.institution || ''} <span class="autofill-tag">ORCID</span>`;
+
+    // Fill research description
+    const descEl = document.getElementById('research-desc');
+    if(descEl && data.research_description) {
+      descEl.textContent = data.research_description;
+      descEl.style.color = 'var(--ash-black)';
+      descEl.style.fontStyle = 'normal';
+    }
+
+    // Fill paper count in autofill description
+    const descMeta = document.querySelector('#orcid-result .section-desc');
+    if(descMeta) descMeta.textContent = `Auto-generated from your ${data.paper_count} publications. Edit freely \u2014 the AI reads this daily to score papers.`;
+
+    // Fill arXiv name variants
+    const chips = document.getElementById('arxiv-name-chips');
+    if(chips && data.self_match) {
+      chips.innerHTML = data.self_match.map(n =>
+        `<span class="chip chip-pine">${n} <span class="remove" onclick="this.parentElement.remove()">&times;</span></span>`
+      ).join('') + '<span class="chip chip-ghost">+ add</span>';
+    }
+
+  } catch(e) {
+    alert('ORCID lookup failed: ' + e.message);
+  }
+  if(btn){ btn.textContent = 'Look up'; btn.style.opacity = '1'; }
+}
+
+// ── Auto-fill categories + keywords (real API) ──
+async function autoFillAll(){
+  const btn = document.getElementById('autofill-btn');
+  const st = document.getElementById('autofill-status');
+  btn.textContent = 'Working...'; btn.style.opacity = '.6';
+  st.style.display = 'block'; st.textContent = 'Analysing your publications...';
+
+  // Get research description from the form
+  const descEl = document.getElementById('research-desc') || document.getElementById('research-desc-manual');
+  const text = descEl?.textContent?.trim() || '';
+  if(!text) {
+    st.textContent = 'Write a research description first (Step 1)';
+    btn.textContent = 'Auto-fill'; btn.style.opacity = '1';
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/ai/suggest', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        research_description: text,
+        orcid_keywords: state.orcidData?.keywords || null,
+        ...getAIKeys(),
+      }),
+    });
+    const data = await resp.json();
+    if(data.error) { st.textContent = data.error; btn.textContent = 'Auto-fill'; btn.style.opacity = '1'; return; }
+
+    // Fill categories
+    const cats = data.categories || [];
+    state.selectedCats = cats;
+    const catChips = document.getElementById('cat-astro-chips');
+    if(catChips) {
+      catChips.querySelectorAll('.chip').forEach(c => {
+        const name = c.textContent.replace(/\s*\u00d7\s*/, '').trim();
+        if(cats.includes(name)) {
+          c.className = 'chip chip-pine';
+          c.innerHTML = name + ' <span class="remove" onclick="unselectCat(this)">&times;</span>';
+        }
+      });
+      // Also check other group expanders
+      document.querySelectorAll('#cat-container .chip').forEach(c => {
+        const name = c.textContent.replace(/\s*\u00d7\s*/, '').trim();
+        if(cats.includes(name)) {
+          c.className = 'chip chip-pine';
+          c.innerHTML = name + ' <span class="remove" onclick="unselectCat(this)">&times;</span>';
+        }
+      });
+    }
+    document.getElementById('cat-astro-count').textContent = cats.filter(c => c.startsWith('astro-ph')).length + '/6';
+    document.getElementById('cat-astro').classList.add('open');
+
+    // Fill keywords
+    const kws = data.keywords || {};
+    state.keywords = kws;
+    const kwChips = document.getElementById('kw-chips');
+    const kwNames = Object.keys(kws);
+    kwChips.innerHTML = kwNames.map(k =>
+      `<span class="chip chip-pine">${k} <span class="remove" onclick="removeKeyword(this, '${k.replace(/'/g, "\\'")}')">&times;</span></span>`
+    ).join('') + '<span class="chip chip-ghost">+ add keyword</span>';
+
+    // Fill advanced keyword table
+    const tbody = document.getElementById('kw-tbody');
+    const empty = document.getElementById('kw-empty-row'); if(empty) empty.remove();
+    tbody.innerHTML = '';
+    kwNames.forEach(name => {
+      const w = kws[name];
+      const cls = w <= 2 ? 'low' : w <= 5 ? 'mid' : w <= 8 ? 'high' : 'max';
+      const label = w <= 2 ? 'loosely follow' : w <= 5 ? 'interested' : w <= 8 ? 'main interest' : 'everything';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="kw-name">${name}</td><td><div class="kw-weight"><span class="kw-arrow" onclick="adjustWeight(this,1)">&#x25B2;</span><span class="kw-score">${w}</span><span class="kw-arrow" onclick="adjustWeight(this,-1)">&#x25BC;</span></div><span class="kw-label ${cls}">${label}</span></td><td style="text-align:center;"><input type="checkbox" style="accent-color:var(--pine);width:14px;height:14px;"></td><td style="text-align:center;color:var(--warm-grey);cursor:pointer;" onclick="this.parentElement.remove()">&times;</td>`;
+      tbody.appendChild(tr);
+    });
+
+    st.textContent = `${cats.length} categories + ${kwNames.length} keywords suggested \u2014 edit freely`;
+    btn.textContent = 'Auto-filled!'; btn.style.opacity = '1';
+    document.getElementById('autofill-bar').style.borderColor = '#c0d4c6';
+    document.getElementById('autofill-bar').style.background = 'var(--pine-wash)';
+
+  } catch(e) {
+    st.textContent = 'Error: ' + e.message;
+    btn.textContent = 'Auto-fill'; btn.style.opacity = '1';
+  }
+}
+
+function unselectCat(removeEl) {
+  const chip = removeEl.parentElement;
+  const name = chip.textContent.replace(/\s*\u00d7\s*/, '').trim();
+  chip.className = 'chip chip-ghost';
+  chip.style.fontStyle = 'normal';
+  chip.innerHTML = name;
+  chip.onclick = () => selectCat(chip, name);
+  state.selectedCats = state.selectedCats.filter(c => c !== name);
+}
+
+function selectCat(chip, name) {
+  chip.className = 'chip chip-pine';
+  chip.innerHTML = name + ' <span class="remove" onclick="event.stopPropagation();unselectCat(this)">&times;</span>';
+  chip.onclick = null;
+  if(!state.selectedCats.includes(name)) state.selectedCats.push(name);
+}
+
+function removeKeyword(removeEl, name) {
+  removeEl.parentElement.remove();
+  delete state.keywords[name];
+}
+
+function adjustWeight(arrowEl, delta) {
+  const scoreEl = arrowEl.parentElement.querySelector('.kw-score');
+  let v = parseInt(scoreEl.textContent) + delta;
+  v = Math.max(0, Math.min(10, v));
+  scoreEl.textContent = v;
+  const labelEl = arrowEl.parentElement.nextElementSibling;
+  const cls = v <= 2 ? 'low' : v <= 5 ? 'mid' : v <= 8 ? 'high' : 'max';
+  const label = v <= 2 ? 'loosely follow' : v <= 5 ? 'interested' : v <= 8 ? 'main interest' : 'everything';
+  labelEl.className = 'kw-label ' + cls;
+  labelEl.textContent = label;
+}
+
+// ── Suggest people (real API) ──
+async function aiSuggestPeople(){
+  if(!state.orcidData) { alert('Look up your ORCID first (Step 1)'); return; }
+
+  const btn = document.getElementById('ai-suggest-people-btn');
+  const st = document.getElementById('ai-people-status');
+  btn.textContent = 'Finding...'; btn.style.opacity = '.6';
+  st.style.display = 'inline'; st.textContent = 'Scanning co-authors...';
+
+  const coauthors = state.orcidData.coauthor_counts || {};
+  const coauthorNames = Object.keys(coauthors);
+
+  // Show co-authors directly (sorted by paper count)
+  const resultsEl = document.getElementById('ai-people-results');
+  const chipsHtml = coauthorNames.slice(0, 10).map(name =>
+    `<span class="chip chip-gold" style="cursor:pointer;" onclick="addColleague(this, '${name.replace(/'/g, "\\'")}')">${name} (${coauthors[name]})</span>`
+  ).join('');
+
+  resultsEl.innerHTML = `<div style="font-size:11px;color:#8a6f00;margin-bottom:6px;font-weight:600;">Co-authors from your publications (${coauthorNames.length} found) &mdash; click to add</div>`
+    + `<div class="chip-group">${chipsHtml}</div>`
+    + (coauthorNames.length > 10 ? `<div class="section-desc" style="margin-top:8px;cursor:pointer;color:var(--pine);text-decoration:underline;" onclick="showAllCoauthors()">Show all ${coauthorNames.length} &#x2193;</div><div id="extra-coauthors" style="display:none;"><div class="chip-group" style="margin-top:4px;">${coauthorNames.slice(10).map(name => `<span class="chip chip-gold" style="cursor:pointer;" onclick="addColleague(this, '${name.replace(/'/g, "\\'")}')">${name} (${coauthors[name]})</span>`).join('')}</div></div>` : '')
+    + `<div style="margin-top:6px;"><button class="btn-clear" onclick="document.getElementById('ai-people-results').style.display='none'">Hide suggestions</button></div>`;
+
+  resultsEl.style.display = 'block';
+  btn.textContent = 'Suggest from co-authors'; btn.style.opacity = '1';
+  st.textContent = coauthorNames.length + ' found \u2014 click to add';
+}
+
+function showAllCoauthors() {
+  const el = document.getElementById('extra-coauthors');
+  if(el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function addColleague(chipEl, name) {
+  if(state.colleagues.includes(name)) return;
+  state.colleagues.push(name);
+  chipEl.style.opacity = '.4';
+  chipEl.style.pointerEvents = 'none';
+
+  const collChips = document.getElementById('coll-chips');
+  const ghost = collChips.querySelector('.chip-ghost');
+  const newChip = document.createElement('span');
+  newChip.className = 'chip chip-pine';
+  newChip.innerHTML = `${name} <span class="remove" onclick="removeColleague(this, '${name.replace(/'/g, "\\'")}')">&times;</span>`;
+  collChips.insertBefore(newChip, ghost);
+
+  const clearBtn = document.getElementById('coll-clear-btn');
+  if(clearBtn) clearBtn.style.display = '';
+}
+
+function removeColleague(removeEl, name) {
+  removeEl.parentElement.remove();
+  state.colleagues = state.colleagues.filter(c => c !== name);
+}
+
+function clearColleagues(){
+  const chips = document.getElementById('coll-chips');
+  chips.innerHTML = '<span class="chip chip-ghost">+ add person</span>';
+  state.colleagues = [];
+  const btn = document.getElementById('coll-clear-btn'); if(btn) btn.style.display = 'none';
+}
+
+// ── Config download (real API) ──
+async function downloadConfig(){
+  const descEl = document.getElementById('research-desc') || document.getElementById('research-desc-manual');
+  const nameField = document.querySelector('#orcid-result .mock-input.autofilled');
+  const instFields = document.querySelectorAll('#orcid-result .mock-input.autofilled');
+
+  // Read current keyword weights from the advanced table
+  const kws = {};
+  document.querySelectorAll('#kw-tbody tr').forEach(tr => {
+    const name = tr.querySelector('.kw-name')?.textContent;
+    const score = tr.querySelector('.kw-score')?.textContent;
+    if(name && score) kws[name] = parseInt(score);
+  });
+  // Fallback to state if table is empty
+  const keywords = Object.keys(kws).length > 0 ? kws : state.keywords;
+
+  // Read schedule
+  const freqLabel = document.getElementById('freq-label')?.textContent || 'Mon, Wed, Fri';
+  const scheduleMap = {'Mon, Wed, Fri': 'mon_wed_fri', 'every weekday': 'weekdays', 'Mondays': 'weekly'};
+  const schedule = scheduleMap[freqLabel] || 'mon_wed_fri';
+
+  // Read digest mode
+  const modeEl = document.querySelector('#step-4 .radio-group:first-of-type .radio-option.active .radio-title');
+  const digestMode = modeEl?.textContent?.toLowerCase() === 'in-depth' ? 'in_depth' : 'highlights';
+
+  const payload = {
+    digest_name: 'arXiv Digest',
+    researcher_name: nameField?.textContent?.replace(/ORCID$/, '').trim() || state.orcidData?.name || '',
+    research_context: descEl?.textContent?.trim() || '',
+    categories: state.selectedCats,
+    keywords: keywords,
+    self_match: state.orcidData?.self_match || [],
+    research_authors: state.researchAuthors,
+    colleagues_people: state.colleagues.map(name => ({name, match: []})),
+    colleagues_institutions: [],
+    digest_mode: digestMode,
+    schedule: schedule,
+    send_hour_utc: 7,
+    institution: instFields?.[1]?.textContent?.replace(/ORCID$/, '').trim() || state.orcidData?.institution || '',
+  };
+
+  try {
+    const resp = await fetch('/api/config/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+
+    // Trigger download
+    const blob = new Blob([data.config_yaml], {type: 'text/yaml'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'config.yaml'; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Config generation failed: ' + e.message);
+  }
+}
+
+// ── Mini flow config download ──
+async function downloadMiniConfig(){
+  const kws = {};
+  document.querySelectorAll('#flow-mini table tbody tr:not(:last-child)').forEach(tr => {
+    const name = tr.querySelector('td')?.textContent?.trim();
+    const scoreEl = tr.querySelector('strong');
+    if(name && scoreEl) kws[name] = parseInt(scoreEl.textContent);
+  });
+
+  const modeEl = document.querySelector('#mini-3 .radio-group:first-of-type .radio-option.active .radio-title');
+  const digestMode = modeEl?.textContent?.toLowerCase().includes('in-depth') ? 'in_depth' : 'highlights';
+
+  const freqEl = document.querySelector('#mini-3 .radio-group:nth-of-type(2) .radio-option.active .radio-title');
+  const freqMap = {'Mon / Wed / Fri': 'mon_wed_fri', 'Every weekday': 'weekdays', 'Weekly': 'weekly'};
+  const schedule = freqMap[freqEl?.textContent] || 'mon_wed_fri';
+
+  const payload = {
+    keywords: kws,
+    digest_mode: digestMode,
+    schedule: schedule,
+    send_hour_utc: 7,
+    colleagues_people: state.colleagues.map(name => ({name, match: []})),
+  };
+
+  try {
+    const resp = await fetch('/api/config/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    const blob = new Blob([data.config_yaml], {type: 'text/yaml'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'config.yaml'; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Config generation failed: ' + e.message); }
+}
+
+// ── Radio / frequency helpers ──
+function setRadio(el){ el.parentElement.querySelectorAll('.radio-option').forEach(o => o.classList.remove('active')); el.classList.add('active'); }
+function pickFreq(el, label){ setRadio(el); document.getElementById('freq-label').textContent = label; setTimeout(() => { document.getElementById('freq-picker').style.display = 'none'; }, 200); }
+function toggleAdvanced(linkEl, targetId){ const t = document.getElementById(targetId); const open = t.style.display !== 'none'; t.style.display = open ? 'none' : 'block'; linkEl.innerHTML = linkEl.innerHTML.replace(open ? '\u2191' : '\u2193', open ? '\u2193' : '\u2191'); }
+function toggleCat(id){ document.getElementById(id).classList.toggle('open'); }
+function toggleFoldout(id){ document.getElementById(id).classList.toggle('collapsed'); }
+
+// ── Card layout customization ──
+let currentCardPreset = 'default';
+let scoreVisible = true;
+
+function toggleScoreBadge(){
+  scoreVisible = !scoreVisible;
+  const item = document.getElementById('score-toggle').closest('.card-order-item');
+  item.classList.toggle('off', !scoreVisible);
+  const el = document.getElementById('ep-score');
+  if(el){ el.style.display = scoreVisible ? '' : 'none'; if(scoreVisible){ el.classList.remove('highlight'); void el.offsetWidth; el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 1200); } }
+  currentCardPreset = 'custom';
+  document.querySelectorAll('#card-customize .radio-option').forEach(r => r.classList.remove('active'));
+}
+
+function toggleOrderItem(li){
+  li.classList.toggle('off');
+  currentCardPreset = 'custom';
+  document.querySelectorAll('#card-customize .radio-option').forEach(r => r.classList.remove('active'));
+  syncCardPreview();
+}
+
+function moveOrderItem(li, dir){
+  const list = li.parentElement;
+  if(dir === -1 && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+  else if(dir === 1 && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
+  li.style.animation = 'none'; void li.offsetWidth; li.style.animation = 'slideIn .2s ease';
+  syncCardPreview();
+}
+
+function syncCardPreview(){
+  const body = document.querySelector('.email-card-body');
+  const items = [...document.querySelectorAll('#card-order-list .card-order-item')];
+  items.forEach(li => {
+    const name = li.dataset.el;
+    const el = document.getElementById('ep-'+name);
+    if(!el) return;
+    const on = !li.classList.contains('off');
+    el.style.display = on ? '' : 'none';
+    if(on){ body.appendChild(el); el.classList.remove('highlight'); void el.offsetWidth; el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 1200); }
+  });
+  const absToggle = body.querySelector('.abstract-toggle');
+  if(absToggle) body.appendChild(absToggle.parentElement);
+}
+
+function setPreset(el, preset){
+  setRadio(el);
+  currentCardPreset = preset;
+  const presets = {default:{summary:1,why:1,score:1,tags:1,finding:0}, minimal:{summary:0,why:0,score:0,tags:0,finding:0}, full:{summary:1,why:1,score:1,tags:1,finding:1}};
+  const p = presets[preset];
+  document.querySelectorAll('#card-order-list .card-order-item').forEach(li => {
+    const on = !!p[li.dataset.el];
+    li.classList.toggle('off', !on);
+  });
+  scoreVisible = !!p.score;
+  const scoreItem = document.getElementById('score-toggle').closest('.card-order-item');
+  scoreItem.classList.toggle('off', !scoreVisible);
+  const ep = document.getElementById('ep-score');
+  if(ep) ep.style.display = scoreVisible ? '' : 'none';
+  syncCardPreview();
+}
+
+// ── Upload config overlay ──
+function openUpload(){ document.getElementById('upload-overlay').classList.add('show'); }
+function closeUpload(){ document.getElementById('upload-overlay').classList.remove('show'); document.getElementById('upload-status').style.display = 'none'; }
+
+function handleUpload(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const st = document.getElementById('upload-status');
+    st.style.display = 'block'; st.style.color = 'var(--pine)';
+    st.textContent = 'Loaded: ' + f.name + ' \u2014 parsing...';
+    // TODO: parse YAML and pre-fill form fields
+    setTimeout(() => closeUpload(), 1500);
+  };
+  reader.readAsText(f);
+}
+
+const dz = document.getElementById('upload-dropzone');
+if(dz){
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); const f = e.dataTransfer.files[0]; if(f) handleUpload({files:[f]}); });
+}
+
+// ── Student flow ──
+function validateStudentEmail(){
+  const v = document.getElementById('stu-email').value.trim().toLowerCase();
+  const s = document.getElementById('stu-email-status');
+  if(!v){ s.className = 'status'; s.style.display = 'none'; return; }
+  if(/^au\d{6}$/.test(v)){ s.className = 'status ok'; s.textContent = v + '@uni.au.dk'; s.style.display = 'inline-block'; }
+  else { s.className = 'status err'; s.textContent = 'Must be au + 6 digits'; s.style.display = 'inline-block'; }
+}
+
+function checkStudentPass(){
+  const p = document.getElementById('stu-pass').value, c = document.getElementById('stu-pass2').value, el = document.getElementById('stu-pass-strength');
+  if(!p){ el.textContent = ''; return; }
+  if(p.length < 4){ el.style.color = '#C0392B'; el.textContent = 'Too short'; }
+  else if(p.length < 8){ el.style.color = '#a08520'; el.textContent = 'OK'; }
+  else { el.style.color = 'var(--pine)'; el.textContent = 'Strong'; }
+  if(c && c !== p){ el.style.color = '#C0392B'; el.textContent = 'Passwords don\u2019t match'; }
+}
+
+function togglePkg(el){ el.classList.toggle('selected'); }
+
+function stuValidateStep1(){
+  const e = document.getElementById('stu-email').value.trim().toLowerCase();
+  const p = document.getElementById('stu-pass').value;
+  const p2 = document.getElementById('stu-pass2').value;
+  if(!/^au\d{6}$/.test(e)){ document.getElementById('stu-email-status').className = 'status err'; document.getElementById('stu-email-status').textContent = 'Must be au + 6 digits'; document.getElementById('stu-email-status').style.display = 'inline-block'; return; }
+  if(p.length < 4){ document.getElementById('stu-pass-strength').style.color = '#C0392B'; document.getElementById('stu-pass-strength').textContent = 'Password too short'; return; }
+  if(p !== p2){ document.getElementById('stu-pass-strength').style.color = '#C0392B'; document.getElementById('stu-pass-strength').textContent = 'Passwords don\u2019t match'; return; }
+  done('stu-1'); go('stu-2');
+}
+
+function stuValidateStep2(){
+  const sel = document.querySelectorAll('#flow-student .package-card.selected');
+  if(sel.length === 0){
+    const grid = document.querySelector('#flow-student .package-grid');
+    grid.style.outline = '2px solid #C0392B'; grid.style.outlineOffset = '4px'; grid.style.borderRadius = '8px';
+    setTimeout(() => { grid.style.outline = ''; grid.style.outlineOffset = ''; }, 2000);
+    return;
+  }
+  done('stu-2'); go('stu-3');
+}
+
+async function stuSubscribe(){
+  const btn = document.getElementById('stu-subscribe-btn');
+  const st = document.getElementById('stu-subscribe-status');
+  const email = (document.getElementById('stu-email').value.trim().toLowerCase() || 'au000000') + '@uni.au.dk';
+  const password = document.getElementById('stu-pass')?.value || '';
+  const pkgs = [...document.querySelectorAll('#flow-student .package-card.selected')].map(c =>
+    c.querySelector('.pkg-name').textContent.toLowerCase().replace(/[^a-z]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  );
+  const maxPapers = document.querySelector('#flow-student .radio-option.active .radio-title')?.textContent?.includes('15') ? 15 : 6;
+
+  btn.textContent = 'Subscribing...'; btn.style.opacity = '.6';
+  st.style.display = 'block'; st.style.color = 'var(--warm-grey)';
+  st.innerHTML = '<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--warm-grey);">POST /api/students/register</span>';
+
+  try {
+    const resp = await fetch('/api/students/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email, password, package_ids: pkgs, max_papers_per_week: maxPapers }),
+    });
+    const data = await resp.json();
+    if(data.error) {
+      btn.textContent = 'Subscribe'; btn.style.opacity = '1';
+      st.style.color = '#C0392B'; st.textContent = data.error;
+      return;
+    }
+    btn.textContent = 'Subscribed!'; btn.style.background = 'var(--pine-light)';
+    st.style.color = 'var(--pine)';
+    st.innerHTML = `<div style="margin-bottom:6px;">Confirmation email sent to ${email}</div>`
+      + `<div style="background:var(--ash-white);border:1px solid var(--card-border);border-radius:4px;padding:8px 10px;font-family:DM Mono,monospace;font-size:10px;color:var(--warm-grey);text-align:left;white-space:pre;line-height:1.6;">`
+      + JSON.stringify(data, null, 2) + '</div>';
+  } catch(e) {
+    btn.textContent = 'Subscribe'; btn.style.opacity = '1';
+    st.style.color = '#C0392B'; st.textContent = 'Connection error: ' + e.message;
+  }
+}
+
+// ── Legacy compatibility aliases ──
+function aiSuggestCats(){ autoFillAll(); }
+function aiSuggestKeywords(){ autoFillAll(); }
+function aiSuggestColleagues(){ aiSuggestPeople(); }
+
+/* ── Auto-fill all (single button: cats + keywords) ── */
+function autoFillAll(){
+  const btn=document.getElementById('autofill-btn'),st=document.getElementById('autofill-status');
+  btn.textContent='Working...';btn.style.opacity='.6';
+  st.style.display='block';st.textContent='Reading 23 publications...';
+  setTimeout(()=>{
+    st.textContent='Suggesting categories...';
+    // Fill categories
+    const chips=document.getElementById('cat-astro-chips');
+    if(chips){['astro-ph.SR','astro-ph.EP','astro-ph.GA','astro-ph.IM','astro-ph.CO'].forEach(name=>{
+      chips.querySelectorAll('.chip').forEach(c=>{if(c.textContent.trim()===name){c.className='chip chip-pine';c.innerHTML=name+' <span class="remove">&times;</span>';}});
+    });}
+    document.getElementById('cat-astro-count').textContent='5/6';
+    document.getElementById('cat-astro').classList.add('open');
+  },600);
+  setTimeout(()=>{
+    st.textContent='Suggesting keywords...';
+    // Fill keyword chips
+    const kwChips=document.getElementById('kw-chips');
+    kwChips.innerHTML=['gyrochronology','rotation period','open clusters','stellar activity','photometry'].map(k=>'<span class="chip chip-pine">'+k+' <span class="remove">&times;</span></span>').join('')+'<span class="chip chip-ghost">+ add keyword</span>';
+    // Fill advanced keyword table too
+    const tbody=document.getElementById('kw-tbody');
+    const empty=document.getElementById('kw-empty-row');if(empty)empty.remove();
+    const kws=[['gyrochronology',9,'max','main interest',true],['rotation period',8,'high','main interest',false],['open clusters',8,'high','main interest',false],['stellar activity',7,'mid','interested',false],['photometry',3,'low','loosely follow',false]];
+    kws.forEach(([name,w,cls,label,chk])=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td class="kw-name">'+name+'</td><td><div class="kw-weight"><span class="kw-arrow">&#x25B2;</span><span class="kw-score">'+w+'</span><span class="kw-arrow">&#x25BC;</span></div><span class="kw-label '+cls+'">'+label+'</span></td><td style="text-align:center;"><input type="checkbox" '+(chk?'checked ':'')+' style="accent-color:var(--pine);width:14px;height:14px;"></td><td style="text-align:center;color:var(--warm-grey);cursor:pointer;">&times;</td>';
+      tbody.appendChild(tr);
+    });
+  },1100);
+  setTimeout(()=>{
+    btn.textContent='Auto-filled!';btn.style.opacity='1';
+    st.textContent='5 categories + 5 keywords suggested \u2014 edit freely';
+    document.getElementById('autofill-bar').style.borderColor='#c0d4c6';
+    document.getElementById('autofill-bar').style.background='var(--pine-wash)';
+  },1500);
+}
+
+/* ── AI simulate buttons (legacy, kept for compatibility) ── */
+function aiSuggestCats(){
+  const btn=document.getElementById('ai-suggest-cats-btn');if(!btn)return;
+  const st=document.getElementById('ai-cats-status');
+  btn.textContent='Suggesting...';btn.style.opacity='.6';if(st){st.style.display='inline';st.textContent='Analysing...';}
+  setTimeout(()=>{
+    const chips=document.getElementById('cat-astro-chips');
+    if(chips){['astro-ph.SR','astro-ph.EP','astro-ph.GA','astro-ph.IM','astro-ph.CO'].forEach(name=>{
+      chips.querySelectorAll('.chip').forEach(c=>{if(c.textContent.trim()===name){c.className='chip chip-pine';c.innerHTML=name+' <span class="remove">&times;</span>';}});
+    });}
+    document.getElementById('cat-astro-count').textContent='5/6';
+    document.getElementById('cat-astro').classList.add('open');
+    btn.textContent='AI suggest categories';btn.style.opacity='1';
+    const clearBtn=document.getElementById('ai-clear-cats-btn');if(clearBtn)clearBtn.style.display='';
+    if(st)st.textContent='5 suggested';
+  },1000);
+}
+function clearAiCats(){
+  document.querySelectorAll('#cat-container .chip-pine').forEach(c=>{
+    const name=c.textContent.replace(/\s*\u00d7\s*/,'').trim();
+    c.className='chip chip-ghost';c.style.fontStyle='normal';c.innerHTML=name;
+  });
+  document.getElementById('cat-astro-count').textContent='0/6';
+  document.getElementById('ai-clear-cats-btn').style.display='none';
+  document.getElementById('ai-cats-status').style.display='none';
+}
+function aiSuggestKeywords(){
+  const btn=document.getElementById('ai-suggest-kw-btn'),st=document.getElementById('ai-kw-status'),tbody=document.getElementById('kw-tbody');
+  btn.textContent='Suggesting...';btn.style.opacity='.6';st.style.display='inline';st.textContent='Reading papers...';
+  setTimeout(()=>{
+    const empty=document.getElementById('kw-empty-row');if(empty)empty.remove();
+    const kws=[['gyrochronology',9,'max','main interest',true],['rotation period',8,'high','main interest',false],['open clusters',8,'high','main interest',false],['stellar activity',7,'mid','interested',false],['photometry',3,'low','loosely follow',false]];
+    kws.forEach(([name,w,cls,label,chk])=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td class="kw-name">'+name+'</td><td><div class="kw-weight"><span class="kw-arrow">&#x25B2;</span><span class="kw-score">'+w+'</span><span class="kw-arrow">&#x25BC;</span></div><span class="kw-label '+cls+'">'+label+'</span></td><td style="text-align:center;"><input type="checkbox" '+(chk?'checked ':'')+' style="accent-color:var(--pine);width:14px;height:14px;"></td><td style="text-align:center;color:var(--warm-grey);cursor:pointer;">&times;</td>';
+      tbody.appendChild(tr);
+    });
+    btn.textContent='AI suggest keywords';btn.style.opacity='1';
+    document.getElementById('ai-clear-kw-btn').style.display='';
+    st.textContent='5 suggested';
+  },1000);
+}
+function clearAiKeywords(){
+  const tbody=document.getElementById('kw-tbody');
+  tbody.innerHTML='<tr id="kw-empty-row"><td colspan="5" style="text-align:center;color:var(--warm-grey);font-style:italic;padding:16px;">No keywords yet. Add manually below or use AI suggest.</td></tr>';
+  document.getElementById('ai-clear-kw-btn').style.display='none';
+  document.getElementById('ai-kw-status').style.display='none';
+}
+function aiSuggestPeople(){
+  const btn=document.getElementById('ai-suggest-people-btn'),st=document.getElementById('ai-people-status');
+  btn.textContent='Finding...';btn.style.opacity='.6';st.style.display='inline';st.textContent='Scanning publications...';
+  setTimeout(()=>{
+    document.getElementById('ai-people-results').style.display='block';
+    btn.textContent='Suggest from co-authors';btn.style.opacity='1';
+    st.textContent='14 found \u2014 click to add';
+  },800);
+}
+function aiSuggestColleagues(){aiSuggestPeople();}
+function clearColleagues(){
+  const chips=document.getElementById('coll-chips');
+  chips.innerHTML='<span class="chip chip-ghost">+ add person</span>';
+  const btn=document.getElementById('coll-clear-btn');if(btn)btn.style.display='none';
+}
+function setRadio(el){el.parentElement.querySelectorAll('.radio-option').forEach(o=>o.classList.remove('active'));el.classList.add('active');}
+function pickFreq(el,label){setRadio(el);document.getElementById('freq-label').textContent=label;setTimeout(()=>{document.getElementById('freq-picker').style.display='none';},200);}
+function toggleAdvanced(linkEl,targetId){const t=document.getElementById(targetId);const open=t.style.display!=='none';t.style.display=open?'none':'block';linkEl.innerHTML=linkEl.innerHTML.replace(open?'\u2191':'\u2193',open?'\u2193':'\u2191');}
+
+function toggleCat(id){document.getElementById(id).classList.toggle('open');}
+function toggleFoldout(id){document.getElementById(id).classList.toggle('collapsed');}
+
+let currentCardPreset='default';
+let scoreVisible=true;
+function toggleScoreBadge(){
+  scoreVisible=!scoreVisible;
+  const item=document.getElementById('score-toggle').closest('.card-order-item');
+  item.classList.toggle('off',!scoreVisible);
+  const el=document.getElementById('ep-score');
+  if(el){el.style.display=scoreVisible?'':'none';if(scoreVisible){el.classList.remove('highlight');void el.offsetWidth;el.classList.add('highlight');setTimeout(()=>el.classList.remove('highlight'),1200);}}
+  currentCardPreset='custom';
+  document.querySelectorAll('#card-customize .radio-option').forEach(r=>r.classList.remove('active'));
+}
+function toggleOrderItem(li){
+  li.classList.toggle('off');
+  currentCardPreset='custom';
+  // Deselect preset radios since user customised
+  document.querySelectorAll('#card-customize .radio-option').forEach(r=>r.classList.remove('active'));
+  syncCardPreview();
+}
+function moveOrderItem(li,dir){
+  const list=li.parentElement;
+  if(dir===-1&&li.previousElementSibling){list.insertBefore(li,li.previousElementSibling);}
+  else if(dir===1&&li.nextElementSibling){list.insertBefore(li.nextElementSibling,li);}
+  li.style.animation='none';void li.offsetWidth;li.style.animation='slideIn .2s ease';
+  syncCardPreview();
+}
+function syncCardPreview(){
+  const body=document.querySelector('.email-card-body');
+  const items=[...document.querySelectorAll('#card-order-list .card-order-item')];
+  items.forEach(li=>{
+    const name=li.dataset.el;
+    const el=document.getElementById('ep-'+name);
+    if(!el)return;
+    const on=!li.classList.contains('off');
+    el.style.display=on?'':'none';
+    if(on){body.appendChild(el);el.classList.remove('highlight');void el.offsetWidth;el.classList.add('highlight');setTimeout(()=>el.classList.remove('highlight'),1200);}
+  });
+  // Keep abstract toggle at the end
+  const absToggle=body.querySelector('.abstract-toggle');
+  if(absToggle)body.appendChild(absToggle.parentElement);
+}
+function setPreset(el,preset){
+  setRadio(el);
+  currentCardPreset=preset;
+  const presets={default:{summary:1,why:1,score:1,tags:1,finding:0},minimal:{summary:0,why:0,score:0,tags:0,finding:0},full:{summary:1,why:1,score:1,tags:1,finding:1}};
+  const p=presets[preset];
+  document.querySelectorAll('#card-order-list .card-order-item').forEach(li=>{
+    const on=!!p[li.dataset.el];
+    li.classList.toggle('off',!on);
+  });
+  // Score badge (separate toggle)
+  scoreVisible=!!p.score;
+  const scoreItem=document.getElementById('score-toggle').closest('.card-order-item');
+  scoreItem.classList.toggle('off',!scoreVisible);
+  const ep=document.getElementById('ep-score');
+  if(ep)ep.style.display=scoreVisible?'':'none';
+  syncCardPreview();
+}
+function getCardLabel(){
+  if(currentCardPreset==='custom')return 'Custom card';
+  return currentCardPreset.charAt(0).toUpperCase()+currentCardPreset.slice(1)+' card';
+}
+
+/* ── Upload overlay ── */
+function openUpload(){document.getElementById('upload-overlay').classList.add('show');}
+function closeUpload(){document.getElementById('upload-overlay').classList.remove('show');document.getElementById('upload-status').style.display='none';}
+function handleUpload(input){
+  const f=input.files[0];if(!f)return;
+  const st=document.getElementById('upload-status');
+  st.style.display='block';st.style.color='var(--pine)';
+  st.textContent='Loaded: '+f.name+' — filling in your settings...';
+  setTimeout(()=>{closeUpload();},1500);
+}
+const dz=document.getElementById('upload-dropzone');
+if(dz){dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)handleUpload({files:[f]});});}
+
+/* ── Student flow functions ── */
+function validateStudentEmail(){
+  const v=document.getElementById('stu-email').value.trim().toLowerCase();
+  const s=document.getElementById('stu-email-status');
+  if(!v){s.className='status';s.style.display='none';return;}
+  if(/^au\d{6}$/.test(v)){s.className='status ok';s.textContent=v+'@uni.au.dk';s.style.display='inline-block';}
+  else{s.className='status err';s.textContent='Must be au + 6 digits';s.style.display='inline-block';}
+}
+function checkStudentPass(){
+  const p=document.getElementById('stu-pass').value,c=document.getElementById('stu-pass2').value,el=document.getElementById('stu-pass-strength');
+  if(!p){el.textContent='';return;}
+  if(p.length<4){el.style.color='#C0392B';el.textContent='Too short';}
+  else if(p.length<8){el.style.color='#a08520';el.textContent='OK';}
+  else{el.style.color='var(--pine)';el.textContent='Strong';}
+  if(c&&c!==p){el.style.color='#C0392B';el.textContent='Passwords don\u2019t match';}
+}
+function togglePkg(el){el.classList.toggle('selected');}
+function stuValidateStep1(){
+  const e=document.getElementById('stu-email').value.trim().toLowerCase();
+  const p=document.getElementById('stu-pass').value;
+  const p2=document.getElementById('stu-pass2').value;
+  if(!/^au\d{6}$/.test(e)){document.getElementById('stu-email-status').className='status err';document.getElementById('stu-email-status').textContent='Must be au + 6 digits';document.getElementById('stu-email-status').style.display='inline-block';return;}
+  if(p.length<4){document.getElementById('stu-pass-strength').style.color='#C0392B';document.getElementById('stu-pass-strength').textContent='Password too short';return;}
+  if(p!==p2){document.getElementById('stu-pass-strength').style.color='#C0392B';document.getElementById('stu-pass-strength').textContent='Passwords don\u2019t match';return;}
+  done('stu-1');go('stu-2');
+}
+function stuValidateStep2(){
+  const sel=document.querySelectorAll('#flow-student .package-card.selected');
+  if(sel.length===0){
+    const grid=document.querySelector('#flow-student .package-grid');
+    grid.style.outline='2px solid #C0392B';grid.style.outlineOffset='4px';grid.style.borderRadius='8px';
+    setTimeout(()=>{grid.style.outline='';grid.style.outlineOffset='';},2000);
+    return;
+  }
+  done('stu-2');go('stu-3');
+}
+function stuSubscribe(){
+  const btn=document.getElementById('stu-subscribe-btn'),st=document.getElementById('stu-subscribe-status');
+  const email=document.getElementById('stu-email').value.trim().toLowerCase()||'au612345';
+  const pkgs=[...document.querySelectorAll('#flow-student .package-card.selected')].map(c=>c.querySelector('.pkg-name').textContent.toLowerCase().replace(/[^a-z]/g,'-'));
+  btn.textContent='Subscribing...';btn.style.opacity='.6';
+  st.style.display='block';st.style.color='var(--warm-grey)';
+  st.innerHTML='<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--warm-grey);">POST /api/students</span>';
+  setTimeout(()=>{
+    btn.textContent='Subscribed!';btn.style.background='var(--pine-light)';
+    st.style.color='var(--pine)';
+    st.innerHTML='<div style="margin-bottom:6px;">Confirmation email sent to '+email+'@uni.au.dk</div>'+
+      '<div style="background:var(--ash-white);border:1px solid var(--card-border);border-radius:4px;padding:8px 10px;font-family:DM Mono,monospace;font-size:10px;color:var(--warm-grey);text-align:left;white-space:pre;line-height:1.6;">'+
+      '{ "ok": true,\n  "subscription": {\n    "package_ids": '+JSON.stringify(pkgs)+',\n    "max_papers_per_week": '+
+      (document.querySelector('#flow-student .radio-option.active .radio-title')?.textContent.includes('15')?'15':'6')+
+      '\n  },\n  "confirmation_email_sent": true }</div>';
+  },1200);
+}
+
+</script>
+
+</body>
+</html>

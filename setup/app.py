@@ -1430,11 +1430,11 @@ if _has_server_key():
     _record_usage(user_email)
     st.success("Ready — AI powered by Gemini.")
 else:
-    # No server key — user must bring their own
-    st.markdown("## Choose your AI")
+    # No server key — user can optionally bring their own for smarter setup
+    st.markdown("## AI scoring (optional)")
     st.markdown(
-        "AI is used throughout — for finding your profile, suggesting keywords, and scoring papers in your daily digest. "
-        "Your key is only used during this session and never stored."
+        "Add an AI key to auto-fill your profile, suggest keywords, and score papers more accurately. "
+        "Without a key, keyword matching still works — you can always add one later as a repo secret."
     )
     col_g, col_a = st.columns(2)
     with col_g:
@@ -1471,12 +1471,12 @@ else:
             st.error(f"Key didn't work: {_key_err}")
             st.stop()
     else:
-        st.warning(
-            "Enter an API key above to continue. AI is required for profile search and paper scoring."
+        st.info(
+            "No AI key — that's fine! You'll fill in categories and keywords manually. "
+            "Add a key later as a repo secret for smarter daily scoring."
         )
-        st.stop()
 
-ai_assist = True  # AI is always on when we reach this point
+ai_assist = _ai_available()
 
 st.divider()
 
