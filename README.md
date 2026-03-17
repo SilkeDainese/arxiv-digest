@@ -8,7 +8,7 @@ Created by [Silke S. Dainese](https://silkedainese.github.io) · [dainese@phys.a
 
 I built this for myself — I am a PhD student in astronomy at Aarhus University and I wanted a smarter way to stay on top of new papers. Other people found it useful, so I made it public. It works for anyone on arXiv.
 
-> **For students:** The setup wizard has a simpler astronomy path with pre-built interest packages. If you want something similar for your field, [write me](mailto:dainese@phys.au.dk).
+> **For students:** The config page has a simpler astronomy path with pre-built interest packages. If you want something similar for your field, [write me](mailto:dainese@phys.au.dk).
 
 ---
 
@@ -44,48 +44,29 @@ Three steps. No terminal needed.
 
 **That's it.** Your digest now runs automatically **Mon/Wed/Fri at 9am Danish time**. Papers show up in your inbox — no further action needed.
 
-> [!NOTE]
-> **No invite code?** You can send from your own email instead — add `SMTP_USER` and `SMTP_PASSWORD` ([Gmail App Password →](https://myaccount.google.com/apppasswords)) as secrets instead of the relay token.
+---
+
+## FAQ
 
 <details>
-<summary>Prefer a terminal flow?</summary>
+<summary><strong>How does scoring work?</strong></summary>
 
-Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the config page, waits for the file in Downloads, forks the repo, uploads the config, and enables Actions.
-
-</details>
-
----
-
-> **Do I need an API key?** No — keyword scoring works without any key. Add one later if you want smarter ranking.
-
-> **Can I change the schedule?** Yes — edit the cron line in `.github/workflows/digest.yml`.
-
-> **Can I run it locally?** `python digest.py --preview` renders a digest in your browser without sending email.
-
-> **How do I pause or unsubscribe?** Disable the workflow or delete the fork — see [Managing Your Digest](#managing-your-digest).
-
-> **How do I give feedback on papers?** Click the ↑/↓ arrows on each card. Future digests learn from your votes.
-
----
-
-## How Scoring Works
-
-You describe your research in `config.yaml` — your keywords, your field, a free-text description of what you work on, and optionally your collaborators. The digest uses that profile to score every new arXiv paper in three steps:
+You describe your research in the config file — keywords, field, a free-text description of your work, and optionally your collaborators. The digest scores every new arXiv paper in three steps:
 
 ```mermaid
 flowchart LR
-    A["📄 config.yaml\n(your interests)"] --> B["📡 arXiv API\n(new papers)"]
-    B --> C["🔑 Keyword match\n(weighted, fuzzy)"]
-    C --> D["🤖 AI re-ranking\n(reads your research context)"]
-    D --> E["👥 Author boost\n(colleagues flagged)"]
-    E --> F["📧 Digest\n(top papers delivered)"]
+    A["📄 Your interests"] --> B["📡 arXiv API"]
+    B --> C["🔑 Keyword match"]
+    C --> D["🤖 AI re-ranking"]
+    D --> E["👥 Author boost"]
+    E --> F["📧 Digest"]
 ```
 
 1. **Keyword matching** — your keywords vs. each paper's title and abstract, weighted 1–10. Fuzzy: `planet` matches `planetary`.
 2. **AI re-ranking** — reads your free-text research description and re-ranks by *actual relevance*, not just term overlap. The more specific your description, the better.
 3. **Author boost** — papers by your collaborators get bumped. Papers you authored get a celebration section.
 
-**What if AI is unavailable?** The system cascades automatically:
+If AI is unavailable, the system cascades automatically:
 
 | Tier | Provider | What happens |
 |------|----------|--------------|
@@ -95,77 +76,94 @@ flowchart LR
 
 If one tier fails, the next takes over. You always get a digest.
 
-**Feedback loop.** When you click ↑/↓ on a paper card, it creates a GitHub issue that the next run ingests. Upvoted keywords get a scoring boost; downvoted ones get dampened. The system learns what you care about over time.
-
----
-
-## Optional Upgrades
-
-| Upgrade | What it does | How |
-|---------|--------------|-----|
-| **AI scoring** | Smarter paper ranking | Add `GEMINI_API_KEY` ([free →](https://aistudio.google.com/apikey)) or `ANTHROPIC_API_KEY` as a repo secret |
-| **Feedback arrows** | ↑/↓ buttons to improve future scoring | Set `github_repo` in your config.yaml |
-| **Keyword tracking** | See which keywords match over time | **Settings → Actions → Workflow permissions** → "Read and write" |
-
----
+</details>
 
 <details>
-<summary><strong>Config Reference</strong></summary>
+<summary><strong>Do I need an API key?</strong></summary>
 
-See [`config.example.yaml`](config.example.yaml) for all options with inline comments.
-
-| Field | Description |
-|-------|-------------|
-| `research_context` | Free-text description of your research (used by AI scoring) — the more specific, the better |
-| `keywords` | Dictionary of `keyword: weight` pairs (1–10) |
-| `keyword_aliases` | Optional `keyword: [similar phrases]` overrides for brittle terminology |
-| `categories` | arXiv categories to monitor |
-| `self_match` | How your name appears in arXiv author lists — triggers a celebration section when you publish |
-| `research_authors` | Authors whose papers get a relevance boost |
-| `colleagues` | People/institutions whose papers always show; people can carry an optional `note` shown in the digest |
-| `digest_mode` | `highlights` (fewer, higher-quality picks) or `in_depth` (wider net, more papers) |
-| `recipient_view_mode` | `deep_read` (full cards) or `5_min_skim` (top 3 one-line summaries) |
-| `github_repo` | Your fork's path, e.g. `janedoe/arxiv-digest` — enables feedback arrows and self-service links |
-| `setup_url` | Optional override for the "Re-run setup wizard" footer link |
+No. Keyword scoring works without any key. AI keys make the ranking smarter — add one later from [Google AI Studio](https://aistudio.google.com/apikey) (free) or [Anthropic Console](https://console.anthropic.com/). Add it as a repo secret, same way you added your other secrets.
 
 </details>
 
 <details>
-<summary><strong>Managing Your Digest</strong></summary>
+<summary><strong>What if I don't have an invite code?</strong></summary>
 
-Every digest email includes self-service links at the bottom:
+You can send digests from your own email instead. Add these secrets instead of the relay token:
 
-- **Edit interests** → opens `config.yaml` in GitHub's web editor
-- **Pause** → links to the Actions tab (disable the workflow)
-- **Re-run setup** → opens the setup wizard
-- **Delete** → links to repo Settings (Danger Zone → Delete repository)
+- `SMTP_USER` — your email address
+- `SMTP_PASSWORD` — an app password ([Gmail →](https://myaccount.google.com/apppasswords))
 
-Each paper card includes feedback arrows when `github_repo` is set:
-
-- **↑** = relevant (more like this)
-- **↓** = not relevant (less like this)
-
-**To unsubscribe:** Disable the workflow (pause) or delete the fork (permanent).
+Outlook users: also set `smtp_server: "smtp.office365.com"` in your config file.
 
 </details>
 
----
+<details>
+<summary><strong>How does the feedback loop work?</strong></summary>
 
-## Development
+When you click ↑ or ↓ on a paper card in your digest email, it creates a GitHub issue in your fork. The next run reads those issues automatically — upvoted keywords get a scoring boost, downvoted ones get dampened. The system learns what you care about over time.
+
+To enable feedback arrows, set `github_repo: "yourusername/arxiv-digest"` in your config file.
+
+</details>
+
+<details>
+<summary><strong>Can I change the schedule?</strong></summary>
+
+Yes — edit the cron line in `.github/workflows/digest.yml`. The default is Mon/Wed/Fri at 9am Danish time.
+
+</details>
+
+<details>
+<summary><strong>How do I pause or unsubscribe?</strong></summary>
+
+- **Pause:** Go to your repo → **Actions** → **arXiv Digest** → click **⋯** → **Disable workflow**
+- **Delete:** Go to your repo → **Settings** → scroll to Danger Zone → **Delete this repository**
+
+Every digest email also includes self-service links at the bottom (edit interests, pause, re-run setup, delete).
+
+</details>
+
+<details>
+<summary><strong>Can I run it locally?</strong></summary>
 
 ```bash
 pip install -r requirements.txt
 python digest.py --preview        # renders in browser, no email
 python digest.py                  # full run (needs RECIPIENT_EMAIL + email secrets)
-cd setup && streamlit run app.py  # run the setup wizard locally
+cd setup && streamlit run app.py  # run the config page locally
 ```
 
-Outlook users: set `smtp_server: "smtp.office365.com"` in config.yaml. Maintainers: see [CONTRIBUTING.md](CONTRIBUTING.md) for invite code setup.
+</details>
+
+<details>
+<summary><strong>Can I use the terminal to set up instead?</strong></summary>
+
+Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the config page, waits for the file in Downloads, forks the repo, uploads the config, and enables Actions.
+
+</details>
+
+<details>
+<summary><strong>What can I customise?</strong></summary>
+
+See [`config.example.yaml`](config.example.yaml) for all options with inline comments. Key fields:
+
+| Field | What it does |
+|-------|-------------|
+| `research_context` | Free-text description of your research — the more specific, the better |
+| `keywords` | `keyword: weight` pairs (1–10) |
+| `categories` | arXiv categories to monitor (e.g. `astro-ph.EP`) |
+| `research_authors` | Authors whose papers get a relevance boost |
+| `colleagues` | People/institutions whose papers always show |
+| `digest_mode` | `highlights` (fewer, better) or `in_depth` (wider net) |
+| `recipient_view_mode` | `deep_read` (full cards) or `5_min_skim` (top 3 one-liners) |
+| `self_match` | Your name as it appears on arXiv — triggers a celebration when you publish |
+
+</details>
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Maintainers: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Created by [Silke S. Dainese](https://silkedainese.github.io)** · Aarhus University · Dept. of Physics & Astronomy
