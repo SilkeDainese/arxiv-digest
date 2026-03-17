@@ -6,9 +6,7 @@
 
 Created by [Silke S. Dainese](https://silkedainese.github.io) · [dainese@phys.au.dk](mailto:dainese@phys.au.dk) · [ORCID](https://orcid.org/0009-0001-7885-2439)
 
-I built this for myself — I am a PhD student in astronomy at Aarhus University and I wanted a smarter way to stay on top of new papers. Other people found it useful, so I made it public. It works for anyone on arXiv.
-
-> **For students:** The config page has a simpler astronomy path with pre-built interest packages. If you want something similar for your field, [write me](mailto:dainese@phys.au.dk).
+I built this for myself — I am a PhD student in astronomy at Aarhus University and I wanted a smarter way to stay on top of new papers. Other people found it useful, so I made it public. It works for anyone on arXiv. **Students** — there's a [simpler setup path](#im-a-student--is-there-an-easier-way) for you in the FAQ.
 
 ---
 
@@ -48,6 +46,45 @@ Three steps. No terminal needed.
 
 ## FAQ
 
+### Setup
+
+<details>
+<summary><strong>I'm a student — is there an easier way?</strong></summary>
+
+Yes. On the config page, choose the **student mini-setup**. It gives you pre-built interest packages (exoplanets, stars, galaxies, cosmology) with sensible defaults and a lighter weekly schedule. You can customise it later.
+
+If you're from a field other than astronomy and would like similar packages, [write me](mailto:dainese@phys.au.dk) and I'll set it up.
+
+</details>
+
+<details>
+<summary><strong>What if I don't have an invite code?</strong></summary>
+
+You can send digests from your own email instead. Add these secrets instead of the relay token:
+
+- `SMTP_USER` — your email address
+- `SMTP_PASSWORD` — an app password ([Gmail →](https://myaccount.google.com/apppasswords))
+
+Outlook users: also set `smtp_server: "smtp.office365.com"` in your config file.
+
+</details>
+
+<details>
+<summary><strong>Do I need an API key?</strong></summary>
+
+No. Keyword scoring works without any key. AI keys make the ranking smarter — add one later from [Google AI Studio](https://aistudio.google.com/apikey) (free) or [Anthropic Console](https://console.anthropic.com/). Add it as a repo secret, same way you added your other secrets.
+
+</details>
+
+<details>
+<summary><strong>Can I use the terminal to set up instead?</strong></summary>
+
+Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the config page, waits for the file in Downloads, forks the repo, uploads the config, and enables Actions.
+
+</details>
+
+### How it works
+
 <details>
 <summary><strong>How does scoring work?</strong></summary>
 
@@ -79,25 +116,6 @@ If one tier fails, the next takes over. You always get a digest.
 </details>
 
 <details>
-<summary><strong>Do I need an API key?</strong></summary>
-
-No. Keyword scoring works without any key. AI keys make the ranking smarter — add one later from [Google AI Studio](https://aistudio.google.com/apikey) (free) or [Anthropic Console](https://console.anthropic.com/). Add it as a repo secret, same way you added your other secrets.
-
-</details>
-
-<details>
-<summary><strong>What if I don't have an invite code?</strong></summary>
-
-You can send digests from your own email instead. Add these secrets instead of the relay token:
-
-- `SMTP_USER` — your email address
-- `SMTP_PASSWORD` — an app password ([Gmail →](https://myaccount.google.com/apppasswords))
-
-Outlook users: also set `smtp_server: "smtp.office365.com"` in your config file.
-
-</details>
-
-<details>
 <summary><strong>How does the feedback loop work?</strong></summary>
 
 When you click ↑ or ↓ on a paper card in your digest email, it creates a GitHub issue in your fork. The next run reads those issues automatically — upvoted keywords get a scoring boost, downvoted ones get dampened. The system learns what you care about over time.
@@ -105,6 +123,8 @@ When you click ↑ or ↓ on a paper card in your digest email, it creates a Git
 To enable feedback arrows, set `github_repo: "yourusername/arxiv-digest"` in your config file.
 
 </details>
+
+### Using your digest
 
 <details>
 <summary><strong>Can I change the schedule?</strong></summary>
@@ -124,25 +144,6 @@ Every digest email also includes self-service links at the bottom (edit interest
 </details>
 
 <details>
-<summary><strong>Can I run it locally?</strong></summary>
-
-```bash
-pip install -r requirements.txt
-python digest.py --preview        # renders in browser, no email
-python digest.py                  # full run (needs RECIPIENT_EMAIL + email secrets)
-cd setup && streamlit run app.py  # run the config page locally
-```
-
-</details>
-
-<details>
-<summary><strong>Can I use the terminal to set up instead?</strong></summary>
-
-Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the config page, waits for the file in Downloads, forks the repo, uploads the config, and enables Actions.
-
-</details>
-
-<details>
 <summary><strong>What can I customise?</strong></summary>
 
 See [`config.example.yaml`](config.example.yaml) for all options with inline comments. Key fields:
@@ -157,6 +158,18 @@ See [`config.example.yaml`](config.example.yaml) for all options with inline com
 | `digest_mode` | `highlights` (fewer, better) or `in_depth` (wider net) |
 | `recipient_view_mode` | `deep_read` (full cards) or `5_min_skim` (top 3 one-liners) |
 | `self_match` | Your name as it appears on arXiv — triggers a celebration when you publish |
+
+</details>
+
+<details>
+<summary><strong>Can I run it locally?</strong></summary>
+
+```bash
+pip install -r requirements.txt
+python digest.py --preview        # renders in browser, no email
+python digest.py                  # full run (needs RECIPIENT_EMAIL + email secrets)
+cd setup && streamlit run app.py  # run the config page locally
+```
 
 </details>
 
