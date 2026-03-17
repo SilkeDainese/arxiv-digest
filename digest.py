@@ -30,7 +30,7 @@ from typing import Any
 
 import yaml
 
-DEFAULT_SETUP_URL = "https://arxiv-digest-setup.streamlit.app"
+DEFAULT_SETUP_URL = "https://arxiv-digest-zhun4k7qjfxbyvrdzfxsbv.streamlit.app"
 
 try:
     import anthropic
