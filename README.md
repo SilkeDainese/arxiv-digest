@@ -39,7 +39,7 @@ This creates your personal copy on GitHub. Everything runs there — nothing is 
 3. Run it:
    `Actions` tab → enable workflows → `arXiv Digest` → `Run workflow`
 
-**That's it.** Your digest now runs automatically Mon/Wed/Fri at 9am Danish time. Papers show up in your inbox — no further action needed.
+**That's it.** *Your digest now runs automatically Mon/Wed/Fri at 9am Danish time. Papers show up in your inbox — no further action needed.*
 
 ---
 
@@ -64,7 +64,7 @@ You can send digests from your own email instead. Add these secrets instead of t
 - `SMTP_USER` — your email address
 - `SMTP_PASSWORD` — an app password ([Gmail →](https://myaccount.google.com/apppasswords))
 
-Outlook users: also set `smtp_server: "smtp.office365.com"` in your config file.
+Outlook users: also set `smtp_server: "smtp.office365.com"` in your [config file](config.example.yaml).
 
 </details>
 
@@ -119,7 +119,7 @@ If one tier fails, the next takes over. You always get a digest.
 
 When you click ↑ or ↓ on a paper card in your digest email, it creates a GitHub issue in your fork. The next run reads those issues automatically — upvoted keywords get a scoring boost, downvoted ones get dampened. The system learns what you care about over time.
 
-To enable feedback arrows, set `github_repo: "yourusername/arxiv-digest"` in your config file.
+To enable feedback arrows, set `github_repo: "yourusername/arxiv-digest"` in your [config file](config.example.yaml).
 
 </details>
 
@@ -128,7 +128,7 @@ To enable feedback arrows, set `github_repo: "yourusername/arxiv-digest"` in you
 <details>
 <summary>Can I change the schedule?</summary>
 
-Yes — edit the cron line in `.github/workflows/digest.yml`. The default is Mon/Wed/Fri at 9am Danish time.
+Yes — edit the cron line in [`.github/workflows/digest.yml`](.github/workflows/digest.yml). The default is Mon/Wed/Fri at 9am Danish time.
 
 </details>
 
