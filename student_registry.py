@@ -64,35 +64,80 @@ def _preferred_password_scheme() -> str:
     return "scrypt" if hasattr(hashlib, "scrypt") else "pbkdf2_sha256"
 
 
+# Scrypt params: N=2^16 (64 MiB) balances OWASP guidance with Vercel serverless limits.
+# pbkdf2 iterations: 600,000 per OWASP recommendation for HMAC-SHA256.
+_SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**16, 8, 1
+_PBKDF2_ITERATIONS = 600_000
+
+
 def hash_password(password: str, *, salt_hex: str | None = None) -> tuple[str, str]:
-    """Hash a password with scrypt, returning (salt_hex, hash_hex)."""
+    """Hash a password, returning (salt_hex, hash_str).
+
+    Hash string format: ``scheme$params$hex`` — params are embedded so the
+    verifier never has to guess which parameters were used. This mirrors
+    the bcrypt/argon2 convention and allows future parameter upgrades.
+    """
     if not password:
         raise ValueError("Password is required.")
     salt = bytes.fromhex(salt_hex) if salt_hex else os.urandom(16)
     scheme = _preferred_password_scheme()
     if scheme == "scrypt":
-        digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1)
+        digest = hashlib.scrypt(
+            password.encode("utf-8"), salt=salt,
+            n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P,
+        )
+        params = f"n={_SCRYPT_N},r={_SCRYPT_R},p={_SCRYPT_P}"
     else:
-        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
-    return salt.hex(), f"{scheme}${digest.hex()}"
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt, _PBKDF2_ITERATIONS,
+        )
+        params = f"iter={_PBKDF2_ITERATIONS}"
+    return salt.hex(), f"{scheme}${params}${digest.hex()}"
 
 
 def verify_password(password: str, salt_hex: str, digest_hex: str) -> bool:
-    """Return True when the password matches the stored hash."""
+    """Return True when the password matches the stored hash.
+
+    Handles both the new 3-part format (``scheme$params$hex``) and the
+    legacy 2-part format (``scheme$hex``) for backward compatibility.
+    """
     if not password or not salt_hex or not digest_hex:
         return False
-    scheme, _, digest_value = digest_hex.partition("$")
-    if not digest_value:
-        scheme = _preferred_password_scheme()
-        digest_value = digest_hex
-
+    parts = digest_hex.split("$")
     salt = bytes.fromhex(salt_hex)
-    if scheme == "scrypt" and hasattr(hashlib, "scrypt"):
-        candidate = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1).hex()
+
+    if len(parts) == 3:
+        # New format: scheme$params$hex
+        scheme, params_str, stored_hex = parts
+        params = dict(kv.split("=") for kv in params_str.split(","))
+        if scheme == "scrypt" and hasattr(hashlib, "scrypt"):
+            n, r, p = int(params["n"]), int(params["r"]), int(params["p"])
+            candidate = hashlib.scrypt(
+                password.encode("utf-8"), salt=salt, n=n, r=r, p=p,
+            ).hex()
+        else:
+            iters = int(params.get("iter", _PBKDF2_ITERATIONS))
+            candidate = hashlib.pbkdf2_hmac(
+                "sha256", password.encode("utf-8"), salt, iters,
+            ).hex()
+            scheme = "pbkdf2_sha256"
     else:
-        candidate = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000).hex()
-        scheme = "pbkdf2_sha256"
-    return hmac.compare_digest(f"{scheme}${candidate}", f"{scheme}${digest_value}")
+        # Legacy format: scheme$hex — use original parameters
+        scheme = parts[0] if len(parts) >= 1 else ""
+        stored_hex = parts[-1]
+        if scheme == "scrypt" and hasattr(hashlib, "scrypt"):
+            candidate = hashlib.scrypt(
+                password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1,
+            ).hex()
+        else:
+            candidate = hashlib.pbkdf2_hmac(
+                "sha256", password.encode("utf-8"), salt, 200_000,
+            ).hex()
+            scheme = "pbkdf2_sha256"
+
+    return hmac.compare_digest(
+        f"{scheme}${stored_hex}", f"{scheme}${candidate}",
+    )
 
 
 def public_record(record: dict[str, Any]) -> dict[str, Any]:
