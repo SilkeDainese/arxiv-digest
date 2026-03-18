@@ -136,6 +136,29 @@ def test_make_student_digest_config_adds_manage_links():
     assert "Galaxies" in config["tagline"]
 
 
+def test_make_student_digest_config_manage_url_has_no_stale_packages():
+    """Manage URL in weekly digest must not pre-fill packages or max_papers.
+
+    Pre-filling from the URL embeds stale data: if a student updates their
+    subscription mid-week and then clicks an older email's manage link, the
+    form silently overwrites their current choices. Email-only URL forces
+    them to load current settings before saving.
+    """
+    import urllib.parse
+    config = make_student_digest_config(
+        {"digest_name": "AU Astronomy Student Weekly", "tagline": "", "max_papers": 20},
+        {
+            "email": "student@example.com",
+            "package_ids": ["exoplanets", "galaxies"],
+            "max_papers_per_week": 5,
+        },
+    )
+    params = urllib.parse.parse_qs(urllib.parse.urlparse(config["subscription_manage_url"]).query)
+    assert "packages" not in params, "Manage URL must not pre-fill packages (stale overwrite risk)"
+    assert "max_papers" not in params, "Manage URL must not pre-fill max_papers (stale overwrite risk)"
+    assert "email" in params, "Manage URL must include email for convenience"
+
+
 def test_public_record_strips_sensitive_fields():
     record = build_student_record(
         email="student@example.com",

@@ -223,12 +223,11 @@ def make_student_digest_config(base_config: dict[str, Any], subscription: dict[s
     email = subscription["email"]
     config["recipient_email"] = email
     config["max_papers"] = int(subscription["max_papers_per_week"])
-    packages_csv = ",".join(subscription["package_ids"])
-    manage_params = {
-        "email": email,
-        "packages": packages_csv,
-        "max_papers": str(subscription["max_papers_per_week"]),
-    }
+    # Email only — no packages or max_papers in the URL. Pre-filling from a
+    # weekly email embeds stale data: a student who updates mid-week and then
+    # clicks an older link would silently overwrite their current subscription.
+    # The manage page's "Load current settings" button is the correct path.
+    manage_params = {"email": email}
     config["subscription_manage_url"] = (
         f"{STUDENT_MANAGE_URL}?{urllib.parse.urlencode(manage_params)}"
     )
