@@ -88,6 +88,7 @@
   .mock-input { background:var(--ash-white); border:1px solid var(--card-border); border-radius:6px; padding:9px 12px; font-size:13px; color:var(--warm-grey); font-style:italic; width:100%; }
   .mock-input.filled { color:var(--ash-black); font-style:normal; background:white; border-color:var(--pine-light); }
   .mock-input.autofilled { background:var(--pine-wash); border-color:var(--pine-light); }
+  .mock-input[contenteditable]:focus, .mock-textarea[contenteditable]:focus { outline:none; border-color:var(--pine); color:var(--ash-black); font-style:normal; background:white; }
   .mock-textarea { background:var(--ash-white); border:1px solid var(--card-border); border-radius:6px; padding:9px 12px; font-size:13px; color:var(--warm-grey); font-style:italic; min-height:80px; width:100%; line-height:1.5; }
 
   /* Chips */
@@ -344,12 +345,12 @@
       <!-- No-ORCID manual fields (shown when skipping) -->
       <div id="manual-profile" style="display:none;margin-top:12px;">
         <div class="field-row">
-          <div class="field"><label>Your name</label><div class="mock-input">Your name...</div></div>
-          <div class="field"><label>Institution</label><div class="mock-input">University / lab...</div></div>
+          <div class="field"><label>Your name</label><div class="mock-input" id="manual-name" contenteditable="true" spellcheck="false" data-placeholder="Your name...">Your name...</div></div>
+          <div class="field"><label>Institution</label><div class="mock-input" id="manual-institution" contenteditable="true" spellcheck="false" data-placeholder="University / lab...">University / lab...</div></div>
         </div>
         <div class="section-label">Research description</div>
         <div class="section-desc">Describe your research like you'd tell a colleague. More specific = better AI scoring.</div>
-        <div class="field"><div class="mock-textarea" id="research-desc-manual" style="min-height:80px;">Write your research focus here...</div></div>
+        <div class="field"><div class="mock-textarea" id="research-desc-manual" contenteditable="true" spellcheck="false" data-placeholder="Write your research focus here..." style="min-height:80px;">Write your research focus here...</div></div>
       </div>
 
       <!-- Advanced profile fields -->
@@ -1417,7 +1418,7 @@ async function downloadConfig(){
 
   const payload = {
     digest_name: 'arXiv Digest',
-    researcher_name: nameField?.textContent?.replace(/ORCID$/, '').trim() || state.orcidData?.name || '',
+    researcher_name: nameField?.textContent?.replace(/ORCID$/, '').trim() || state.orcidData?.name || document.getElementById('manual-name')?.textContent?.trim().replace(/^Your name\.\.\.$/, '') || '',
     research_context: descEl?.textContent?.trim() || '',
     categories: state.selectedCats,
     keywords: keywords,
@@ -1428,7 +1429,7 @@ async function downloadConfig(){
     digest_mode: digestMode,
     schedule: schedule,
     send_hour_utc: 7,
-    institution: instFields?.[1]?.textContent?.replace(/ORCID$/, '').trim() || state.orcidData?.institution || '',
+    institution: instFields?.[1]?.textContent?.replace(/ORCID$/, '').trim() || state.orcidData?.institution || document.getElementById('manual-institution')?.textContent?.trim().replace(/^University \/ lab\.\.\.$/, '') || '',
   };
 
   try {
@@ -1834,6 +1835,16 @@ function fillFromConfig(cfg) {
   updateStepSummary('step-2');
   updateStepSummary('step-3');
 }
+
+// ── Placeholder behaviour for contenteditable fields ──
+document.querySelectorAll('[contenteditable][data-placeholder]').forEach(el => {
+  el.addEventListener('focus', () => {
+    if(el.textContent === el.dataset.placeholder) { el.textContent = ''; }
+  });
+  el.addEventListener('blur', () => {
+    if(!el.textContent.trim()) { el.textContent = el.dataset.placeholder; el.style.color = ''; el.style.fontStyle = ''; }
+  });
+});
 
 // ── Init on load ──
 initCatChips();
