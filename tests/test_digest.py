@@ -17,9 +17,11 @@ Covers:
 
 import json
 import os
+import smtplib
 import tempfile
+import urllib.error
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -1358,3 +1360,130 @@ class TestFetchArxivXmlParsing:
                 unique.append(p)
         assert len(unique) == 2
         assert unique[0]["category"] == "astro-ph.SR"  # first occurrence kept
+
+    # ── Fix 4: network failure / malformed XML coverage ──────────
+
+    def _make_config_with_two_categories(self):
+        cfg = make_config()
+        cfg["categories"] = ["astro-ph.SR", "astro-ph.EP"]
+        cfg["days_back"] = 9999  # far future cutoff so all entries are in-window
+        return cfg
+
+    def _valid_xml(self, arxiv_id="2501.00001", author="Jones, B."):
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/{arxiv_id}v1</id>
+    <published>2099-01-01T00:00:00Z</published>
+    <title>A Valid Paper</title>
+    <summary>An abstract.</summary>
+    <author><name>{author}</name></author>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="astro-ph.SR"/>
+  </entry>
+</feed>"""
+
+    def _make_response(self, xml: str):
+        class FakeResp:
+            def read(self_):
+                return xml.encode()
+            def __enter__(self_):
+                return self_
+            def __exit__(self_, *args):
+                pass
+        return FakeResp()
+
+    def test_fetch_skips_category_on_network_error(self, capsys):
+        """URLError for one category is caught; remaining categories still fetched."""
+        good_xml = self._valid_xml()
+        call_count = [0]
+
+        def fake_urlopen(req, timeout=30):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise urllib.error.URLError("connection refused")
+            return self._make_response(good_xml)
+
+        cfg = self._make_config_with_two_categories()
+        with patch("digest.urllib.request.urlopen", side_effect=fake_urlopen):
+            with patch("time.sleep"):  # skip inter-request pause
+                papers = d.fetch_arxiv_papers(cfg)
+
+        captured = capsys.readouterr()
+        assert "⚠️" in captured.out
+        assert len(papers) >= 1  # second category succeeded
+
+    def test_fetch_skips_malformed_xml_entry(self, capsys):
+        """A malformed <entry> (missing <published>) is skipped; no crash."""
+        malformed_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/9999.0000v1</id>
+    <!-- no <published> element — triggers AttributeError in parsing -->
+    <title>Broken Entry</title>
+    <summary>Abstract.</summary>
+    <author><name>Nobody</name></author>
+  </entry>
+</feed>"""
+        cfg = make_config()
+        cfg["categories"] = ["astro-ph.SR"]
+        cfg["days_back"] = 9999
+
+        with patch("digest.urllib.request.urlopen", return_value=self._make_response(malformed_xml)):
+            papers = d.fetch_arxiv_papers(cfg)
+
+        assert papers == []  # malformed entry skipped, no crash
+
+    def test_fetch_returns_empty_on_all_category_failures(self, capsys):
+        """When every category raises URLError, fetch_arxiv_papers returns []."""
+        cfg = self._make_config_with_two_categories()
+
+        with patch("digest.urllib.request.urlopen", side_effect=urllib.error.URLError("all down")):
+            with patch("time.sleep"):
+                papers = d.fetch_arxiv_papers(cfg)
+
+        assert papers == []
+        captured = capsys.readouterr()
+        assert "⚠️" in captured.out
+
+
+# ─────────────────────────────────────────────────────────────
+#  _send_via_smtp — failure path coverage
+# ─────────────────────────────────────────────────────────────
+
+
+class TestSendViaSmtp:
+    """SMTP failure paths must return False and print a helpful message."""
+
+    _COMMON_KWARGS = dict(
+        recipients=["test@example.com"],
+        subject="Test Digest",
+        html="<html></html>",
+        plain_text="plain",
+        smtp_user="user@example.com",
+        smtp_password="secret",
+        smtp_server="smtp.gmail.com",
+        smtp_port=587,
+        digest_name="Test Digest",
+    )
+
+    def test_send_via_smtp_returns_false_on_auth_failure(self, capsys):
+        """SMTPAuthenticationError → returns False and prints SMTP auth failed."""
+        with patch("smtplib.SMTP") as MockSMTP:
+            MockSMTP.return_value.__enter__ = MagicMock(
+                side_effect=smtplib.SMTPAuthenticationError(535, b"auth failed")
+            )
+            MockSMTP.return_value.__exit__ = MagicMock(return_value=False)
+            result = d._send_via_smtp(**self._COMMON_KWARGS)
+
+        assert result is False
+        captured = capsys.readouterr()
+        assert "SMTP auth failed" in captured.out
+
+    def test_send_via_smtp_returns_false_on_connection_error(self, capsys):
+        """OSError (connection refused) → returns False and prints Email send failed."""
+        with patch("smtplib.SMTP", side_effect=OSError("Connection refused")):
+            result = d._send_via_smtp(**self._COMMON_KWARGS)
+
+        assert result is False
+        captured = capsys.readouterr()
+        assert "Email send failed" in captured.out

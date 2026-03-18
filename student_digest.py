@@ -305,6 +305,11 @@ def main(argv: list[str] | None = None) -> int:
     print("\n📡 Fetching papers from arXiv...")
     papers = fetch_arxiv_papers(base_config)
 
+    if not papers:
+        print("\n⚠️  No papers fetched — all arXiv category requests failed or returned nothing.")
+        print("   Skipping student digests to avoid sending empty emails. Check the errors above.")
+        return 1
+
     print("\n👍 Ingesting quick-feedback votes...")
     feedback_stats = ingest_feedback_from_github(base_config)
     apply_feedback_bias(papers, feedback_stats)

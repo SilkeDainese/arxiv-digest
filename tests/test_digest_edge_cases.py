@@ -16,6 +16,9 @@ import pytest
 import yaml
 
 import digest as d
+import sys
+import io
+
 from digest import _default_analysis, _fallback_analyse, load_config, load_keyword_stats, load_feedback_stats, main
 
 
@@ -249,3 +252,120 @@ class TestZeroPaperDigest:
             with pytest.raises(SystemExit):
                 main()
         mock_send.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────
+#  fetch loop — colleague missing "name" field → no crash
+# ─────────────────────────────────────────────────────────────
+
+
+class TestColleagueMissingName:
+    """A colleague dict without a 'name' key must not cause a KeyError crash."""
+
+    def test_colleague_without_name_field_does_not_crash(self):
+        """fetch_arxiv_papers must not raise KeyError when a colleague has no 'name' key."""
+        # Build a minimal config with a colleague entry that has match but no name
+        config = {
+            "categories": ["astro-ph.SR"],
+            "days_back": 7,
+            "research_authors": [],
+            "colleagues": {
+                "people": [{"match": ["Smith"]}],  # no "name" field
+                "institutions": [],
+            },
+            "keywords": {"exoplanet": 8},
+            "keyword_aliases": {},
+            "self_match": [],
+        }
+
+        # XML with one entry whose author matches "Smith"
+        fake_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/2501.00001v1</id>
+    <published>2099-01-01T00:00:00Z</published>
+    <title>A Paper by Smith</title>
+    <summary>Abstract text here.</summary>
+    <author><name>Smith, J.</name></author>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="astro-ph.SR"/>
+  </entry>
+</feed>"""
+
+        class FakeResponse:
+            def read(self):
+                return fake_xml.encode()
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+
+        with patch("urllib.request.urlopen", return_value=FakeResponse()):
+            # Must not raise KeyError
+            papers = d.fetch_arxiv_papers(config)
+        # The paper is returned (even with unnamed colleague)
+        assert isinstance(papers, list)
+
+
+# ─────────────────────────────────────────────────────────────
+#  main() — all papers below min_score → log why, still send
+# ─────────────────────────────────────────────────────────────
+
+
+class TestEmptyFinalPapersLog:
+    """When all papers score below min_score, main() must log a clear message and still send."""
+
+    def _minimal_config(self) -> dict:
+        return {
+            "keywords": {"exoplanet": 8},
+            "research_authors": [],
+            "colleagues": {"people": [], "institutions": []},
+            "keyword_aliases": {},
+            "self_match": [],
+            "digest_name": "arXiv Digest",
+            "digest_mode": "highlights",
+            "max_papers": 6,
+            "min_score": 5,
+            "days_back": 7,
+            "arxiv_categories": ["astro-ph.SR"],
+            "recipient_email": "test@example.com",
+            "recipient_view_mode": "researcher",
+            "smtp_user": "",
+            "smtp_password": "",
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "github_repository": "",
+            "github_token": "",
+            "relay_url": "",
+            "setup_wizard_url": "",
+            "feedback_label": "digest-feedback",
+        }
+
+    def test_empty_final_papers_logs_threshold_warning(self, capsys, tmp_path):
+        """When analyse_papers returns [], main() logs min_score warning and still calls send_email."""
+        config = self._minimal_config()
+        one_paper = make_paper()
+
+        with (
+            patch.object(d, "load_config", return_value=config),
+            patch.object(d, "fetch_arxiv_papers", return_value=[one_paper]),
+            patch.object(d, "ingest_feedback_from_github", return_value={}),
+            patch.object(d, "apply_feedback_bias"),
+            patch.object(d, "mirror_feedback_to_central"),
+            patch.object(d, "update_keyword_stats"),
+            patch.object(d, "pre_filter", return_value=[one_paper]),
+            patch.object(d, "analyse_papers", return_value=([], "keywords")),
+            patch.object(d, "extract_colleague_papers", return_value=[]),
+            patch.object(d, "extract_own_papers", return_value=[]),
+            patch.object(d, "render_html", return_value="<html></html>"),
+            patch.object(d, "send_email", return_value=True) as mock_send,
+            # Redirect HTML output artifact to tmp_path so no real write happens
+            patch.object(d, "Path", return_value=tmp_path / "digest_output.html"),
+        ):
+            try:
+                main()
+            except SystemExit:
+                pass
+
+        captured = capsys.readouterr()
+        assert "all scored below min_score" in captured.out
+        mock_send.assert_called_once()

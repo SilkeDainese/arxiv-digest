@@ -656,7 +656,7 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
                 for colleague in config["colleagues"]["people"]:
                     for pattern in colleague.get("match", []):
                         if pattern.lower() in author.lower():
-                            colleague_name = colleague["name"]
+                            colleague_name = colleague.get("name", "Unknown")
                             if colleague_name not in colleague_flag:
                                 colleague_flag.append(colleague_name)
                             detail = {"name": colleague_name}
@@ -1859,6 +1859,11 @@ def main() -> None:
     print("\n🤖 Analysing papers...")
     final_papers, scoring_method = analyse_papers(candidates, config)
     print(f"   {len(final_papers)} papers made the cut (scoring: {scoring_method})")
+
+    if not final_papers and not colleague_papers and not own_papers:
+        print("\n⚠️  No papers made the cut this week (all scored below min_score threshold).")
+        print(f"   Threshold: {config['min_score']}. Papers fetched: {len(papers)}.")
+        print("   Sending digest anyway to confirm the pipeline is working.")
 
     print("\n🎨 Rendering HTML...")
     html = render_html(final_papers, colleague_papers, config, date_str, own_papers=own_papers, scoring_method=scoring_method)
