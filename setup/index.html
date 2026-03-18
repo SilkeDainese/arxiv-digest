@@ -1420,6 +1420,7 @@ async function downloadConfig(){
       body: JSON.stringify(payload),
     });
     const data = await resp.json();
+    if(data.error) { alert('Config generation failed: ' + data.error); return; }
 
     // Trigger download
     const blob = new Blob([data.config_yaml], {type: 'text/yaml'});
@@ -1463,6 +1464,7 @@ async function downloadMiniConfig(){
       body: JSON.stringify(payload),
     });
     const data = await resp.json();
+    if(data.error) { alert('Config generation failed: ' + data.error); return; }
     const blob = new Blob([data.config_yaml], {type: 'text/yaml'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1619,13 +1621,6 @@ async function stuSubscribe(){
   }
 }
 
-function setRadio(el){el.parentElement.querySelectorAll('.radio-option').forEach(o=>o.classList.remove('active'));el.classList.add('active');}
-function pickFreq(el,label){setRadio(el);document.getElementById('freq-label').textContent=label;setTimeout(()=>{document.getElementById('freq-picker').style.display='none';},200);}
-function toggleAdvanced(linkEl,targetId){const t=document.getElementById(targetId);const open=t.style.display!=='none';t.style.display=open?'none':'block';linkEl.innerHTML=linkEl.innerHTML.replace(open?'\u2191':'\u2193',open?'\u2193':'\u2191');}
-
-function toggleCat(id){document.getElementById(id).classList.toggle('open');}
-function toggleFoldout(id){document.getElementById(id).classList.toggle('collapsed');}
-
 /* ── Upload overlay ── */
 function openUpload(){document.getElementById('upload-overlay').classList.add('show');}
 function closeUpload(){document.getElementById('upload-overlay').classList.remove('show');document.getElementById('upload-status').style.display='none';}
@@ -1666,60 +1661,6 @@ async function handleUpload(input){
 
 const dz=document.getElementById('upload-dropzone');
 if(dz){dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)handleUpload({files:[f]});});}
-
-/* ── Student flow functions ── */
-function validateStudentEmail(){
-  const v=document.getElementById('stu-email').value.trim().toLowerCase();
-  const s=document.getElementById('stu-email-status');
-  if(!v){s.className='status';s.style.display='none';return;}
-  if(/^au\d{6}$/.test(v)){s.className='status ok';s.textContent=v+'@uni.au.dk';s.style.display='inline-block';}
-  else{s.className='status err';s.textContent='Must be au + 6 digits';s.style.display='inline-block';}
-}
-function checkStudentPass(){
-  const p=document.getElementById('stu-pass').value,c=document.getElementById('stu-pass2').value,el=document.getElementById('stu-pass-strength');
-  if(!p){el.textContent='';return;}
-  if(p.length<4){el.style.color='#C0392B';el.textContent='Too short';}
-  else if(p.length<8){el.style.color='#a08520';el.textContent='OK';}
-  else{el.style.color='var(--pine)';el.textContent='Strong';}
-  if(c&&c!==p){el.style.color='#C0392B';el.textContent='Passwords don\u2019t match';}
-}
-function togglePkg(el){el.classList.toggle('selected');}
-function stuValidateStep1(){
-  const e=document.getElementById('stu-email').value.trim().toLowerCase();
-  const p=document.getElementById('stu-pass').value;
-  const p2=document.getElementById('stu-pass2').value;
-  if(!/^au\d{6}$/.test(e)){document.getElementById('stu-email-status').className='status err';document.getElementById('stu-email-status').textContent='Must be au + 6 digits';document.getElementById('stu-email-status').style.display='inline-block';return;}
-  if(p.length<4){document.getElementById('stu-pass-strength').style.color='#C0392B';document.getElementById('stu-pass-strength').textContent='Password too short';return;}
-  if(p!==p2){document.getElementById('stu-pass-strength').style.color='#C0392B';document.getElementById('stu-pass-strength').textContent='Passwords don\u2019t match';return;}
-  done('stu-1');go('stu-2');
-}
-function stuValidateStep2(){
-  const sel=document.querySelectorAll('#flow-student .package-card.selected');
-  if(sel.length===0){
-    const grid=document.querySelector('#flow-student .package-grid');
-    grid.style.outline='2px solid #C0392B';grid.style.outlineOffset='4px';grid.style.borderRadius='8px';
-    setTimeout(()=>{grid.style.outline='';grid.style.outlineOffset='';},2000);
-    return;
-  }
-  done('stu-2');go('stu-3');
-}
-function stuSubscribe(){
-  const btn=document.getElementById('stu-subscribe-btn'),st=document.getElementById('stu-subscribe-status');
-  const email=document.getElementById('stu-email').value.trim().toLowerCase()||'au612345';
-  const pkgs=[...document.querySelectorAll('#flow-student .package-card.selected')].map(c=>c.querySelector('.pkg-name').textContent.toLowerCase().replace(/[^a-z]/g,'-'));
-  btn.textContent='Subscribing...';btn.style.opacity='.6';
-  st.style.display='block';st.style.color='var(--warm-grey)';
-  st.innerHTML='<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--warm-grey);">POST /api/students</span>';
-  setTimeout(()=>{
-    btn.textContent='Subscribed!';btn.style.background='var(--pine-light)';
-    st.style.color='var(--pine)';
-    st.innerHTML='<div style="margin-bottom:6px;">Confirmation email sent to '+email+'@uni.au.dk</div>'+
-      '<div style="background:var(--ash-white);border:1px solid var(--card-border);border-radius:4px;padding:8px 10px;font-family:DM Mono,monospace;font-size:10px;color:var(--warm-grey);text-align:left;white-space:pre;line-height:1.6;">'+
-      '{ "ok": true,\n  "subscription": {\n    "package_ids": '+JSON.stringify(pkgs)+',\n    "max_papers_per_week": '+
-      (document.querySelector('#flow-student .radio-option.active .radio-title')?.textContent.includes('15')?'15':'6')+
-      '\n  },\n  "confirmation_email_sent": true }</div>';
-  },1200);
-}
 
 // ── Keyword table row factory ──
 function makeKwTableRow(name, weight) {
