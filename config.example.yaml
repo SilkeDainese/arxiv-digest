@@ -115,6 +115,5 @@ smtp_port: 587
 # GitHub Actions auto-detects the current repo, so this mainly matters for local previews/manual runs.
 github_repo: ""          # Your fork's path, e.g. "janedoe/arxiv-digest" — enables self-service links in emails
 
-# Optional: override the "Re-run setup wizard" link in the email footer if your
-# Streamlit setup app lives at a different public URL.
-# setup_url: "https://arxiv-digest-zhun4k7qjfxbyvrdzfxsbv.streamlit.app"
+# Optional: override the "Re-run setup wizard" link in the email footer.
+# setup_url: "https://arxiv-digest-production-93ba.up.railway.app"

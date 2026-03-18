@@ -22,7 +22,7 @@ from student_registry import AVAILABLE_STUDENT_PACKAGES
 
 
 DEFAULT_SOURCE_REPO = "SilkeDainese/arxiv-digest"
-DEFAULT_SETUP_URL = "https://arxiv-digest-zhun4k7qjfxbyvrdzfxsbv.streamlit.app"
+DEFAULT_SETUP_URL = "https://arxiv-digest-production-93ba.up.railway.app"
 DOWNLOAD_PATTERNS = (
     "config.yaml",
     "config.yml",
