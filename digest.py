@@ -1359,8 +1359,7 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
     # Summary (plain text finding)
     summary = _esc(_one_sentence(p.get("plain_summary", "")))
 
-    # Abstract toggle + keyword tags
-    abstract = _esc(p.get("abstract", ""))
+    # Keyword tags
     matched_kw = p.get("matched_keywords", [])
     tags_html = " ".join(
         f'<span style="display:inline-block;font-family:\'DM Mono\',monospace;font-size:9px;'
@@ -1378,6 +1377,15 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
             f'line-height:1.5;margin-bottom:8px">{summary}</div>'
         )
 
+    # "Read on arXiv" link (replaces <details> which doesn't work in email clients)
+    arxiv_link = ""
+    paper_url = p.get("url", "")
+    if paper_url:
+        arxiv_link = (
+            f'<a href="{_esc(paper_url)}" style="font-family:\'DM Mono\',monospace;font-size:11px;'
+            f'color:{PINE};text-decoration:none">Read on arXiv &#8594;</a>'
+        )
+
     return f"""
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px">
         <tr><td style="background:white;border:1px solid {CARD_BORDER};border-radius:8px;padding:14px 16px 12px">
@@ -1388,10 +1396,7 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
             <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:8px">{meta_line}</div>
             {au_bio}
             {summary_html}
-            <details style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{WARM_GREY};margin-bottom:6px">
-                <summary style="cursor:pointer;color:{PINE};font-size:11px;margin-bottom:4px">Show abstract</summary>
-                <div style="line-height:1.5;margin-top:4px">{abstract}</div>
-            </details>
+            <div style="margin-bottom:6px">{arxiv_link}</div>
             <div>{tags_html}</div>
         </td></tr>
     </table>"""
