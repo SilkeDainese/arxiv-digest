@@ -559,30 +559,7 @@ def _manage_page(
         margin-bottom: 4px;
         font-weight: 500;
       }}
-      .email-row {{
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }}
-      .email-affix {{
-        font-size: 15px;
-        color: var(--warm-grey);
-        font-family: "IBM Plex Mono", monospace;
-        white-space: nowrap;
-        user-select: none;
-      }}
-      .email-row input {{
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        width: 90px;
-        padding: 10px 12px;
-        text-align: center;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 15px;
-        outline: none;
-        background: #F8F7F4;
-      }}
-      .email-row input:focus {{
+      #email-input:focus {{
         border-color: var(--pine);
         box-shadow: 0 0 0 2px rgba(47,79,62,0.12);
       }}
@@ -727,14 +704,12 @@ def _manage_page(
       <h1>AU student digest</h1>
       <p class="subtitle">Draws from the daily arXiv archive, scored for your interests.</p>
 
-      <!-- AU student ID -->
+      <!-- Email -->
       <div class="field" style="margin-bottom:24px">
-        <label for="email-digits">AU student ID</label>
-        <div class="email-row">
-          <span class="email-affix">au</span>
-          <input id="email-digits" type="text" inputmode="numeric" pattern="\\d{{6}}" maxlength="6" value="{safe_email.replace('au','').replace('@uni.au.dk','')}" placeholder="612345">
-          <span class="email-affix">@uni.au.dk</span>
-        </div>
+        <label for="email-input">Email</label>
+        <input id="email-input" type="email" value="{safe_email}" placeholder="you@example.com"
+          style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+          font-family:'IBM Plex Sans',sans-serif;font-size:14px;background:#F8F7F4;outline:none">
       </div>
 
       <hr class="divider">
@@ -758,14 +733,14 @@ def _manage_page(
 
       <!-- Subscribe button -->
       <button class="primary" type="button" onclick="saveSubscription()">Subscribe</button>
-      <div class="confirm-note">We'll send a confirmation link to your AU email.</div>
+      <div class="confirm-note">We'll send a confirmation link to your email.</div>
 
       <div id="status" class="status"></div>
 
       <!-- Unsubscribe -->
       <div class="unsub-section">
         <button class="unsub-link" type="button" onclick="handleUnsubscribe()">Unsubscribe</button>
-        <div class="unsub-hint">Fill in your AU ID above first.</div>
+        <div class="unsub-hint">Fill in your email above first.</div>
       </div>
     </main>
     <script>
@@ -799,11 +774,11 @@ def _manage_page(
       }}
 
       function getEmail() {{
-        const digits = document.getElementById("email-digits").value.trim();
-        if (!/^\\d{{6}}$/.test(digits)) {{
-          throw new Error("Enter your 6-digit AU student ID.");
+        const email = document.getElementById("email-input").value.trim().toLowerCase();
+        if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{{2,}}$/.test(email)) {{
+          throw new Error("Enter a valid email address.");
         }}
-        return "au" + digits + "@uni.au.dk";
+        return email;
       }}
 
       async function saveSubscription() {{
@@ -832,7 +807,7 @@ def _manage_page(
             return;
           }}
           if (data.confirmation_sent) {{
-            setStatus("Check your AU email for a confirmation link.");
+            setStatus("Check your email for a confirmation link.");
           }} else {{
             setStatus("Could not send confirmation: " + (data.confirmation_error || "unknown error"), true);
           }}
@@ -860,7 +835,7 @@ def _manage_page(
             return;
           }}
           if (data.confirmation_sent) {{
-            setStatus("Check your AU email to confirm unsubscribe.");
+            setStatus("Check your email to confirm unsubscribe.");
           }} else {{
             setStatus("Could not send confirmation: " + (data.confirmation_error || "unknown error"), true);
           }}

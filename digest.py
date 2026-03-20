@@ -1396,8 +1396,7 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
             <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:8px">{meta_line}</div>
             {au_bio}
             {summary_html}
-            <div style="margin-bottom:6px">{arxiv_link}</div>
-            <div>{tags_html}</div>
+            <div>{arxiv_link} {tags_html}</div>
         </td></tr>
     </table>"""
 
