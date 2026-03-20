@@ -1,0 +1,6 @@
+[project]
+name = "arxiv-digest-relay"
+version = "0.1.0"
+description = "Vercel serverless relay for arXiv Digest student subscriptions"
+requires-python = ">=3.12"
+dependencies = []

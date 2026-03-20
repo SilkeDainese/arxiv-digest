@@ -6,3 +6,4 @@ config.yaml
 .coverage
 .pytest_cache/
 .DS_Store
+.vercel
