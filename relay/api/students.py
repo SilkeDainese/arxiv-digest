@@ -254,6 +254,25 @@ def _handle_admin_list(body: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "subscriptions": students, "package_labels": package_labels()}
 
 
+def _handle_resend_confirmation(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Re-send the confirmation email for an existing subscription."""
+    email = normalise_email(body.get("email", ""))
+    registry, _ = _load_registry()
+    record = registry["students"].get(email)
+    if not record:
+        return 404, {"error": "Subscription not found."}
+    if not verify_password(str(body.get("password", "")), record.get("password_salt", ""), record.get("password_hash", "")):
+        return 403, {"error": "Incorrect password."}
+    if not record.get("active", True):
+        return 400, {"error": "Subscription is inactive. Re-subscribe first."}
+    sent, err = _send_subscription_confirmation(record, event="resent")
+    return 200, {
+        "ok": True,
+        "confirmation_email_sent": sent,
+        "confirmation_email_error": err,
+    }
+
+
 def _dispatch(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     action = str(body.get("action", "")).strip().lower()
     if action == "upsert":
@@ -264,6 +283,8 @@ def _dispatch(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         return 200, _handle_unsubscribe(body)
     if action == "admin_list":
         return 200, _handle_admin_list(body)
+    if action == "resend_confirmation":
+        return _handle_resend_confirmation(body)
     return 400, {"error": "unknown action"}
 
 
@@ -420,6 +441,7 @@ def _manage_page(
         <div class="actions">
           <button class="secondary" type="button" onclick="loadCurrent()">Load current settings</button>
           <button type="button" onclick="saveSubscription()">Save packages</button>
+          <button class="secondary" type="button" onclick="resendConfirmation()">Resend confirmation email</button>
           <button class="danger" type="button" onclick="unsubscribe()">Unsubscribe</button>
         </div>
         <div id="status" class="status"></div>
@@ -496,6 +518,20 @@ def _manage_page(
             setStatus(confirmationMessage + " Confirmation email could not be sent: " + data.confirmation_email_error, true);
           }} else {{
             setStatus(confirmationMessage);
+          }}
+        }} catch (error) {{
+          setStatus(error.message, true);
+        }}
+      }}
+
+      async function resendConfirmation() {{
+        setStatus("Sending confirmation email...");
+        try {{
+          const data = await callApi("resend_confirmation");
+          if (data.confirmation_email_sent) {{
+            setStatus("Confirmation email sent. Check your inbox (and spam folder).");
+          }} else {{
+            setStatus("Could not send: " + (data.confirmation_email_error || "unknown error"), true);
           }}
         }} catch (error) {{
           setStatus(error.message, true);
