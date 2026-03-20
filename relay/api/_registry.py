@@ -47,11 +47,11 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def normalise_email(email: str) -> str:
+def normalise_email(email: str, *, require_au: bool = True) -> str:
     normalised = " ".join(str(email).split()).strip().lower()
     if normalised and not _EMAIL_RE.match(normalised):
         raise ValueError(f"Invalid email address: {normalised!r}")
-    if normalised and not _AU_EMAIL_RE.match(normalised):
+    if require_au and normalised and not _AU_EMAIL_RE.match(normalised):
         raise ValueError("Only AU student emails are accepted (auXXXXXX@uni.au.dk).")
     return normalised
 
@@ -93,7 +93,7 @@ def public_record(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalise_public_subscription(record: dict[str, Any]) -> dict[str, Any]:
-    email = normalise_email(record.get("email", ""))
+    email = normalise_email(record.get("email", ""), require_au=False)
     if not email:
         raise ValueError("Subscription record is missing an email.")
     return {

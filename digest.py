@@ -1086,6 +1086,7 @@ from brand import (PINE, GOLD, UMBER, ASH_WHITE, ASH_BLACK,
                    CARD_BORDER, WARM_GREY, PINE_WASH, PINE_LIGHT, GOLD_LIGHT,
                    GOLD_WASH, ALERT_RED, ALERT_RED_WASH, CATALOG_PURPLE, CATALOG_WASH,
                    FONT_HEADING, FONT_BODY, FONT_MONO)
+from setup.data import AU_STUDENT_TRACK_LABELS
 
 
 # ── Shared inline-style constants ──
@@ -1304,17 +1305,19 @@ def detect_au_researchers(papers: list[dict[str, Any]]) -> None:
 
 def _render_student_paper_card(p: dict[str, Any]) -> str:
     """Return a student-mode paper card: score badge, AU badge, compact metadata, abstract toggle."""
-    score = p.get("relevance_score", 5)
-    ac = _accent_color(score)
+    category = p.get("category", "")
     authors_display = ", ".join(p.get("authors", [])[:4])
     if len(p.get("authors", [])) > 4:
         authors_display += f" +{len(p['authors']) - 4}"
 
-    # Score badge
-    score_badge = (
-        f'<span style="display:inline-block;background:{ac};color:white;font-family:\'DM Serif Display\',Georgia,serif;'
-        f'font-size:14px;padding:2px 8px;border-radius:4px;margin-right:6px">{score}</span>'
-    )
+    # Package badge — show the first matched student package as a friendly label
+    pkg_ids = p.get("student_package_ids", [])
+    pkg_label = AU_STUDENT_TRACK_LABELS.get(pkg_ids[0], "") if pkg_ids else ""
+    pkg_badge = (
+        f'<span style="display:inline-block;background:{PINE};color:white;font-family:\'IBM Plex Mono\',monospace;'
+        f'font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;margin-right:6px">'
+        f'{_esc(pkg_label)}</span>'
+    ) if pkg_label else ""
 
     # AU RESEARCHER badge (conditional)
     au_badge = ""
@@ -1342,7 +1345,6 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
             )
 
     # Compact metadata line
-    category = p.get("category", "")
     arxiv_id = p.get("id", "")
     pub_date = p.get("published", "")
     meta_parts = [_esc(authors_display)]
@@ -1378,8 +1380,8 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
 
     return f"""
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px">
-        <tr><td style="background:white;border:1px solid {CARD_BORDER};border-left:4px solid {ac};border-radius:8px;padding:14px 16px 12px">
-            <div style="margin-bottom:6px">{score_badge}{au_badge}</div>
+        <tr><td style="background:white;border:1px solid {CARD_BORDER};border-radius:8px;padding:14px 16px 12px">
+            <div style="margin-bottom:6px">{pkg_badge}{au_badge}</div>
             <div style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;color:{ASH_BLACK};line-height:1.35;margin-bottom:4px">
                 <a href="{p.get('url', '')}" style="color:{ASH_BLACK};text-decoration:none">{_esc(_short_title(p.get('title', '')))}</a>
             </div>
