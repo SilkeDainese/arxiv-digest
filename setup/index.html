@@ -9,6 +9,9 @@
   :root {
     --pine: #2F4F3E; --pine-light: #3D6B52; --pine-wash: #EDF2EF;
     --gold: #EBC944; --gold-wash: #FFF8E1;
+    --gold-dark: #8a6f00; --gold-accent: #a08520;
+    --gold-border: #e8d47a; --pine-border: #c0d4c6;
+    --alert-red: #C0392B; --alert-red-wash: #FFF0F0;
     --ash-white: #F6F5F2; --ash-black: #2B2B2B;
     --warm-grey: #6A6A66; --card-border: #D8D6D0;
   }
@@ -49,7 +52,7 @@
   .ai-key-input::placeholder { color:var(--warm-grey); }
   .ai-key-status { font-family:'DM Mono',monospace; font-size:11px; padding:3px 8px; border-radius:4px; }
   .ai-key-status.ok { background:var(--pine-wash); color:var(--pine); }
-  .ai-key-status.err { background:#FFF0F0; color:#C0392B; }
+  .ai-key-status.err { background:var(--alert-red-wash); color:var(--alert-red); }
   .ai-toggle-label { font-size:13px; }
   .ai-toggle-label small { color:var(--warm-grey); font-size:11px; display:block; margin-top:2px; }
   .toggle-switch { position:relative; width:44px; height:24px; cursor:pointer; }
@@ -94,8 +97,8 @@
   /* Chips */
   .chip-group { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
   .chip { display:inline-flex; align-items:center; gap:4px; border-radius:16px; padding:4px 12px; font-size:12px; cursor:default; }
-  .chip-pine { background:var(--pine-wash); border:1px solid #c0d4c6; color:var(--pine); }
-  .chip-gold { background:var(--gold-wash); border:1px solid #e8d47a; color:#8a6f00; }
+  .chip-pine { background:var(--pine-wash); border:1px solid var(--pine-border); color:var(--pine); }
+  .chip-gold { background:var(--gold-wash); border:1px solid var(--gold-border); color:var(--gold-dark); }
   .chip-ghost { background:transparent; border:1px dashed var(--card-border); color:var(--warm-grey); cursor:pointer; font-style:italic; }
   .chip-ghost:hover { border-color:var(--pine); color:var(--pine); }
   .chip .remove { font-size:10px; opacity:.5; cursor:pointer; }
@@ -107,20 +110,20 @@
   .note { font-size:11px; color:var(--warm-grey); font-style:italic; margin-top:4px; }
 
   /* AI foldout */
-  .ai-foldout { border:1px solid #e8d47a; border-radius:8px; margin:8px 0; overflow:hidden; }
+  .ai-foldout { border:1px solid var(--gold-border); border-radius:8px; margin:8px 0; overflow:hidden; }
   .ai-foldout.disabled { border-color:var(--card-border); opacity:.5; }
   .ai-foldout-header { background:var(--gold-wash); padding:10px 14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; }
   .ai-foldout.disabled .ai-foldout-header { background:#f5f5f3; }
-  .ai-foldout-title { font-size:12px; font-weight:600; color:#8a6f00; display:flex; align-items:center; gap:6px; }
+  .ai-foldout-title { font-size:12px; font-weight:600; color:var(--gold-dark); display:flex; align-items:center; gap:6px; }
   .ai-foldout.disabled .ai-foldout-title { color:var(--warm-grey); }
-  .ai-foldout-chevron { font-size:14px; color:#a08520; transition:transform .2s; }
+  .ai-foldout-chevron { font-size:14px; color:var(--gold-accent); transition:transform .2s; }
   .ai-foldout.collapsed .ai-foldout-body { display:none; }
   .ai-foldout:not(.collapsed) .ai-foldout-chevron { transform:rotate(90deg); }
   .ai-foldout-body { padding:10px 14px; background:var(--gold-wash); border-top:1px solid #e8d47a; }
   .ai-foldout.disabled .ai-foldout-body { background:#f5f5f3; }
-  .ai-foldout-hint { font-size:11px; color:#a08520; margin-bottom:8px; font-style:italic; }
+  .ai-foldout-hint { font-size:11px; color:var(--gold-accent); margin-bottom:8px; font-style:italic; }
   .ai-foldout-actions { display:flex; gap:8px; margin-top:8px; }
-  .ai-clear-btn { background:none; border:1px solid #d4b94a; color:#8a6f00; font-size:11px; padding:3px 10px; border-radius:4px; cursor:pointer; font-family:'DM Mono',monospace; }
+  .ai-clear-btn { background:none; border:1px solid #d4b94a; color:var(--gold-dark); font-size:11px; padding:3px 10px; border-radius:4px; cursor:pointer; font-family:'DM Mono',monospace; }
   .ai-clear-btn:hover { background:rgba(0,0,0,0.05); }
 
   /* Category expandable groups */
@@ -146,7 +149,7 @@
   .kw-score { font-family:'DM Mono',monospace; font-size:12px; min-width:20px; text-align:center; }
   .kw-label { font-family:'DM Mono',monospace; font-size:10px; white-space:nowrap; display:block; margin-top:1px; }
   .kw-label.low { color:var(--warm-grey); }
-  .kw-label.mid { color:#8a6f00; }
+  .kw-label.mid { color:var(--gold-dark); }
   .kw-label.high { color:var(--pine-light); }
   .kw-label.max { color:var(--pine); font-weight:700; }
   .kw-always input[type="checkbox"] { accent-color:var(--pine); width:14px; height:14px; }
@@ -174,7 +177,7 @@
   .email-card { background:white; border:1px solid var(--card-border); border-radius:8px; margin:10px 0; overflow:hidden; font-size:12px; }
   .email-card-topbar { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--pine-wash); border-bottom:1px solid var(--card-border); }
   .email-card-title { font-family:'DM Serif Display',Georgia,serif; font-size:14px; color:var(--pine); flex:1; }
-  .email-card-score { font-family:'DM Mono',monospace; font-size:11px; background:var(--gold-wash); color:#8a6f00; padding:2px 8px; border-radius:4px; margin-left:8px; flex-shrink:0; }
+  .email-card-score { font-family:'DM Mono',monospace; font-size:11px; background:var(--gold-wash); color:var(--gold-dark); padding:2px 8px; border-radius:4px; margin-left:8px; flex-shrink:0; }
   .email-card-authors { padding:6px 14px; font-size:11px; color:var(--warm-grey); border-bottom:1px solid var(--ash-white); }
   .email-card-body { padding:10px 14px; }
   .email-card-section { padding:6px 0; }
@@ -198,7 +201,7 @@
   /* Card element toggles */
   .card-toggles { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
   .card-toggle-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:14px; font-size:11px; cursor:pointer; border:1px solid var(--card-border); background:white; color:var(--warm-grey); transition:all .15s; user-select:none; }
-  .card-toggle-chip.on { background:var(--pine-wash); border-color:#c0d4c6; color:var(--pine); }
+  .card-toggle-chip.on { background:var(--pine-wash); border-color:var(--pine-border); color:var(--pine); }
   .card-toggle-chip:hover { border-color:var(--pine); }
   .card-toggle-chip .dot { width:6px; height:6px; border-radius:50%; background:var(--card-border); }
   .card-toggle-chip.on .dot { background:var(--pine); }
@@ -219,7 +222,7 @@
   .email-validation { display:flex; gap:6px; align-items:center; margin-top:4px; }
   .email-validation .status { font-family:'DM Mono',monospace; font-size:11px; padding:3px 8px; border-radius:4px; display:none; }
   .email-validation .status.ok { display:inline-block; background:var(--pine-wash); color:var(--pine); }
-  .email-validation .status.err { display:inline-block; background:#FFF0F0; color:#C0392B; }
+  .email-validation .status.err { display:inline-block; background:var(--alert-red-wash); color:var(--alert-red); }
   .package-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0; }
   .package-card { border:1px solid var(--card-border); border-radius:8px; padding:12px; cursor:pointer; transition:all .15s; user-select:none; }
   .package-card:hover { border-color:var(--pine); }
@@ -321,7 +324,7 @@
   <div class="step" id="step-1">
     <div class="step-header" onclick="toggleStep('step-1')"><span class="step-num">1</span><span class="step-title">About You</span><span class="step-summary" id="sum-step-1"></span><span class="step-badge">optional</span><span class="step-chevron">&#x276F;</span></div>
     <div class="step-body">
-      <div style="background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pine);">Already set up? <span style="text-decoration:underline;cursor:pointer;" onclick="openUpload()">Upload your config.yaml to edit your settings.</span></div>
+      <div style="background:var(--pine-wash);border:1px solid var(--pine-border);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pine);">Already set up? <span style="text-decoration:underline;cursor:pointer;" onclick="openUpload()">Upload your config.yaml to edit your settings.</span></div>
       <p>If you have an ORCID, we can auto-fill your profile from your publications. Otherwise, fill in your research focus below &mdash; it works just as well.</p>
 
       <details style="font-size:11px;color:var(--warm-grey);margin:-4px 0 12px;">
@@ -336,7 +339,7 @@
 
       <!-- ORCID result + auto-filled profile -->
       <div id="orcid-result" style="display:none;">
-        <div style="background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;padding:12px 14px;margin-top:10px;">
+        <div style="background:var(--pine-wash);border:1px solid var(--pine-border);border-radius:6px;padding:12px 14px;margin-top:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
               <div style="font-size:13px;font-weight:600;color:var(--pine);">Found: Silke S. Dainese</div>
@@ -430,9 +433,9 @@
       </div>
 
       <!-- Auto-fill button (single action: categories + keywords) -->
-      <div id="autofill-bar" style="background:var(--gold-wash);border:1px solid #e8d47a;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
-        <div><div style="font-size:12px;font-weight:600;color:#8a6f00;">Auto-fill from publications</div><div style="font-size:11px;color:#a08520;margin-top:1px;" id="autofill-desc">Suggests categories and keywords from your research description.</div></div>
-        <button class="btn-secondary" style="border-color:#e8d47a;color:#8a6f00;white-space:nowrap;" onclick="autoFillAll()" id="autofill-btn">Auto-fill</button>
+      <div id="autofill-bar" style="background:var(--gold-wash);border:1px solid var(--gold-border);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+        <div><div style="font-size:12px;font-weight:600;color:var(--gold-dark);">Auto-fill from publications</div><div style="font-size:11px;color:var(--gold-accent);margin-top:1px;" id="autofill-desc">Suggests categories and keywords from your research description.</div></div>
+        <button class="btn-secondary" style="border-color:var(--gold-border);color:var(--gold-dark);white-space:nowrap;" onclick="autoFillAll()" id="autofill-btn">Auto-fill</button>
       </div>
       <div id="autofill-status" style="display:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--pine);margin-bottom:8px;"></div>
 
@@ -503,8 +506,8 @@
       </div>
 
       <!-- AI suggestions -->
-      <div id="ai-people-results" style="display:none;margin-top:8px;padding:10px 12px;background:var(--gold-wash);border:1px solid #e8d47a;border-radius:8px;">
-        <div style="font-size:11px;color:#8a6f00;margin-bottom:6px;font-weight:600;">Co-authors from your publications (14 found) &mdash; click to add</div>
+      <div id="ai-people-results" style="display:none;margin-top:8px;padding:10px 12px;background:var(--gold-wash);border:1px solid var(--gold-border);border-radius:8px;">
+        <div style="font-size:11px;color:var(--gold-dark);margin-bottom:6px;font-weight:600;">Co-authors from your publications (14 found) &mdash; click to add</div>
         <div class="chip-group">
           <span class="chip chip-gold" style="cursor:pointer;">C. Advisor (8 papers)</span>
           <span class="chip chip-gold" style="cursor:pointer;">B. Labmate (5)</span>
@@ -655,10 +658,10 @@
     <div>
       <div style="font-size:13px;font-weight:600;">Fork the repo</div>
       <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;"><a href="https://github.com/SilkeDainese/arxiv-digest" target="_blank" style="color:var(--pine);">SilkeDainese/arxiv-digest</a> &rarr; Fork</div>
-      <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">
+      <div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;">
         <strong style="color:var(--ash-black);">Fork</strong> = your own private copy of this project on GitHub. The digest runs from your copy, and any changes you make won't affect anyone else.
       </div>
-      <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">
+      <div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;">
         <strong style="color:var(--ash-black);">Note:</strong> GitHub forks are public by default. Your config (including your email) will be visible. To make it private: Settings &rarr; Danger Zone &rarr; Change visibility.
       </div>
     </div>
@@ -666,7 +669,7 @@
 
   <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
     <span class="step-num" style="width:22px;height:22px;font-size:11px;">2</span>
-    <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes.</div><div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">The file must be named exactly <code style="font-family:'DM Mono',monospace;">config.yaml</code> (not <code style="font-family:'DM Mono',monospace;">config (1).yaml</code> — check your Downloads folder) and placed in the root of your repository, not inside any folder.</div></div>
+    <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes.</div><div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;">The file must be named exactly <code style="font-family:'DM Mono',monospace;">config.yaml</code> (not <code style="font-family:'DM Mono',monospace;">config (1).yaml</code> — check your Downloads folder) and placed in the root of your repository, not inside any folder.</div></div>
   </div>
 
   <div style="display:flex;gap:10px;margin-bottom:4px;align-items:flex-start;">
@@ -678,7 +681,7 @@
         <summary style="font-family:'DM Mono',monospace;font-size:10px;color:var(--warm-grey);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:4px;">
           <span style="font-size:9px;">&#x276F;</span> What's a GitHub secret?
         </summary>
-        <div style="font-size:12px;color:#888;padding:6px 0 2px 14px;line-height:1.5;">
+        <div style="font-size:12px;color:var(--warm-grey);padding:6px 0 2px 14px;line-height:1.5;">
           A GitHub secret is a private setting stored in your repository — like a password vault built into GitHub. Your automated digest can read it when it runs, but it's never visible in your code or to anyone else. This is where you store your email credentials and API keys safely.
         </div>
       </details>
@@ -701,7 +704,7 @@
           <td style="text-align:center;padding:8px 10px;color:var(--pine);font-weight:600;">Yes</td>
         </tr>
         <tr style="border-bottom:1px solid var(--card-border);background:var(--gold-wash);">
-          <td colspan="3" style="padding:6px 10px;font-size:11px;color:#8a6f00;font-weight:600;">Email delivery &mdash; pick one:</td>
+          <td colspan="3" style="padding:6px 10px;font-size:11px;color:var(--gold-dark);font-weight:600;">Email delivery &mdash; pick one:</td>
         </tr>
         <tr id="relay-token-row" style="border-bottom:1px solid var(--card-border);">
           <td style="padding:8px 10px;"><code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">DIGEST_RELAY_TOKEN</code></td>
@@ -712,7 +715,7 @@
           <td colspan="3" style="padding:8px 10px;">
             <div style="font-size:11px;color:var(--pine);font-weight:600;margin-bottom:6px;">Your relay token &mdash; paste this as the secret value:</div>
             <div style="display:flex;gap:6px;align-items:center;">
-              <input id="relay-token-value" type="text" readonly style="flex:1;font-family:'DM Mono',monospace;font-size:11px;padding:4px 8px;border:1px solid var(--card-border);border-radius:4px;background:#fff;color:var(--ink);cursor:text;">
+              <input id="relay-token-value" type="text" readonly style="flex:1;font-family:'DM Mono',monospace;font-size:11px;padding:4px 8px;border:1px solid var(--card-border);border-radius:4px;background:var(--ash-white);color:var(--ash-black);cursor:text;">
               <button onclick="copyRelayToken()" id="relay-token-copy-btn" style="font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border:1px solid var(--pine);border-radius:4px;background:var(--pine);color:#fff;cursor:pointer;white-space:nowrap;">Copy</button>
             </div>
           </td>
@@ -726,7 +729,7 @@
           <td style="text-align:center;padding:8px 10px;font-size:11px;color:var(--warm-grey);">Option B</td>
         </tr>
         <tr style="border-bottom:1px solid var(--card-border);background:var(--gold-wash);">
-          <td colspan="3" style="padding:6px 10px;font-size:11px;color:#8a6f00;font-weight:600;">AI scoring &mdash; optional (improves relevance):</td>
+          <td colspan="3" style="padding:6px 10px;font-size:11px;color:var(--gold-dark);font-weight:600;">AI scoring &mdash; optional (improves relevance):</td>
         </tr>
         <tr style="border-bottom:1px solid var(--card-border);">
           <td style="padding:8px 10px;"><code style="background:var(--pine-wash);color:var(--pine);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;">GEMINI_API_KEY</code></td>
@@ -747,7 +750,7 @@
     <div>
       <div style="font-size:13px;font-weight:600;">Allow Actions &amp; run workflow</div>
       <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;line-height:1.6;">In your fork: go to the <strong>Actions</strong> tab (in the top menu bar). If you see a yellow banner, click "I understand my workflows, go ahead and enable them." Then in the left sidebar, click <strong>arXiv Digest</strong>, then click the grey <strong>Run workflow</strong> button. Your first digest arrives within a few minutes.</div>
-      <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">
+      <div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;">
         <strong style="color:var(--ash-black);">GitHub Actions</strong> runs your digest automatically on a schedule — no server, no cron job, nothing to maintain. It's built into GitHub and runs every time your chosen days roll around.
       </div>
     </div>
@@ -764,7 +767,7 @@
   <div class="step" id="mini-1">
     <div class="step-header" onclick="toggleStep('mini-1')"><span class="step-num">1</span><span class="step-title">Keywords &amp; Interests</span><span class="step-summary" id="sum-mini-1"></span><span class="step-chevron">&#x276F;</span></div>
     <div class="step-body">
-      <div style="background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pine);">Already set up? <span style="text-decoration:underline;cursor:pointer;" onclick="openUpload()">Upload your config.yaml to edit your settings.</span></div>
+      <div style="background:var(--pine-wash);border:1px solid var(--pine-border);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pine);">Already set up? <span style="text-decoration:underline;cursor:pointer;" onclick="openUpload()">Upload your config.yaml to edit your settings.</span></div>
       <p>What topics should your digest cover? Add keywords and set how important each one is.</p>
 
       <div class="section-label">Your keywords</div>
@@ -777,7 +780,7 @@
           <th style="width:24px;"></th>
         </tr></thead>
         <tbody>
-          <tr style="border-bottom:1px solid var(--card-border);background:var(--gold-wash);"><td colspan="4" style="padding:4px 8px;font-size:11px;color:#8a6f00;">These are examples — replace with your own.</td></tr>
+          <tr style="border-bottom:1px solid var(--card-border);background:var(--gold-wash);"><td colspan="4" style="padding:4px 8px;font-size:11px;color:var(--gold-dark);">These are examples — replace with your own.</td></tr>
           <tr style="border-bottom:1px solid var(--card-border);"><td style="padding:6px 8px;">machine learning</td><td style="text-align:center;"><span class="tag-arrow" style="cursor:pointer;">&#x25B2;</span> <strong>8</strong> <span class="tag-arrow" style="cursor:pointer;">&#x25BC;</span></td><td style="text-align:center;"><input type="checkbox"></td><td><span class="remove" style="cursor:pointer;">&times;</span></td></tr>
           <tr style="border-bottom:1px solid var(--card-border);"><td style="padding:6px 8px;">exoplanets</td><td style="text-align:center;"><span class="tag-arrow" style="cursor:pointer;">&#x25B2;</span> <strong>6</strong> <span class="tag-arrow" style="cursor:pointer;">&#x25BC;</span></td><td style="text-align:center;"><input type="checkbox"></td><td><span class="remove" style="cursor:pointer;">&times;</span></td></tr>
           <tr style="border-bottom:1px solid var(--card-border);background:var(--ash-white);"><td colspan="4" style="padding:6px 8px;"><span class="chip-ghost" style="display:inline-block;">+ add keyword</span></td></tr>
@@ -858,13 +861,13 @@
       <div>
         <div style="font-size:13px;font-weight:600;">Fork the repo</div>
         <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;"><a href="https://github.com/SilkeDainese/arxiv-digest" target="_blank" style="color:var(--pine);">SilkeDainese/arxiv-digest</a> &rarr; Fork</div>
-        <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">Fork</strong> = your own private copy of this project on GitHub. Changes you make won't affect anyone else.</div>
-        <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">Note:</strong> GitHub forks are public by default. Your config (including your email) will be visible. To make it private: Settings &rarr; Danger Zone &rarr; Change visibility.</div>
+        <div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">Fork</strong> = your own private copy of this project on GitHub. Changes you make won't affect anyone else.</div>
+        <div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">Note:</strong> GitHub forks are public by default. Your config (including your email) will be visible. To make it private: Settings &rarr; Danger Zone &rarr; Change visibility.</div>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
       <span class="step-num" style="width:22px;height:22px;font-size:11px;">2</span>
-      <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes. Come back and re-run setup anytime.</div><div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">The file must be named exactly <code style="font-family:'DM Mono',monospace;">config.yaml</code> (not <code style="font-family:'DM Mono',monospace;">config (1).yaml</code> — check your Downloads folder) and placed in the root of your repository, not inside any folder.</div></div>
+      <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes. Come back and re-run setup anytime.</div><div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;">The file must be named exactly <code style="font-family:'DM Mono',monospace;">config.yaml</code> (not <code style="font-family:'DM Mono',monospace;">config (1).yaml</code> — check your Downloads folder) and placed in the root of your repository, not inside any folder.</div></div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
       <span class="step-num" style="width:22px;height:22px;font-size:11px;">3</span>
@@ -875,7 +878,7 @@
           <summary style="font-family:'DM Mono',monospace;font-size:10px;color:var(--warm-grey);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:4px;">
             <span style="font-size:9px;">&#x276F;</span> What's a GitHub secret?
           </summary>
-          <div style="font-size:12px;color:#888;padding:6px 0 2px 14px;line-height:1.5;">
+          <div style="font-size:12px;color:var(--warm-grey);padding:6px 0 2px 14px;line-height:1.5;">
             A GitHub secret is a private setting stored in your repository — like a password vault built into GitHub. Your automated digest can read it when it runs, but it's never visible in your code or to anyone else. Add at least: <code style="font-family:'DM Mono',monospace;">RECIPIENT_EMAIL</code> (where to send), and either <code style="font-family:'DM Mono',monospace;">DIGEST_RELAY_TOKEN</code> (from your access code) or <code style="font-family:'DM Mono',monospace;">SMTP_USER</code> + <code style="font-family:'DM Mono',monospace;">SMTP_PASSWORD</code> (your email credentials).
           </div>
         </details>
@@ -886,7 +889,7 @@
       <div>
         <div style="font-size:13px;font-weight:600;">Allow Actions &amp; run workflow</div>
         <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;line-height:1.6;">In your fork: go to the <strong>Actions</strong> tab (in the top menu bar). If you see a yellow banner, click "I understand my workflows, go ahead and enable them." Then in the left sidebar, click <strong>arXiv Digest</strong>, then click the grey <strong>Run workflow</strong> button. Your first digest arrives within a few minutes.</div>
-        <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">GitHub Actions</strong> runs your digest automatically on a schedule — no server, no cron job, nothing to maintain. It's built into GitHub.</div>
+        <div style="font-size:12px;color:var(--warm-grey);margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">GitHub Actions</strong> runs your digest automatically on a schedule — no server, no cron job, nothing to maintain. It's built into GitHub.</div>
       </div>
     </div>
   </div>
@@ -934,7 +937,7 @@ function showError(containerIdOrEl, message) {
   container.querySelectorAll('.setup-error-box').forEach(el => el.remove());
   const box = document.createElement('div');
   box.className = 'setup-error-box';
-  box.style.cssText = 'background:#FFF0F0;border:1px solid #e8b4b4;border-radius:6px;padding:9px 12px;margin:8px 0;font-size:12px;color:#C0392B;display:flex;align-items:flex-start;gap:8px;';
+  box.style.cssText = 'background:var(--alert-red-wash);border:1px solid #e8b4b4;border-radius:6px;padding:9px 12px;margin:8px 0;font-size:12px;color:var(--alert-red);display:flex;align-items:flex-start;gap:8px;';
   box.innerHTML = `<span style="flex:1;">${escapeHtml(message)}</span>`
     + `<span style="cursor:pointer;opacity:.5;font-size:14px;flex-shrink:0;" onclick="this.parentElement.remove()" title="Dismiss">&times;</span>`;
   container.appendChild(box);
@@ -991,7 +994,7 @@ function updateRelayTokenRow() {
     desc.innerHTML = 'From your access code — lets the digest send email without any account setup on your part';
   } else {
     row.style.opacity = '0.45';
-    desc.innerHTML = 'From your access code — lets the digest send email without any account setup on your part<br><span style="font-size:11px;color:#8a6f00;">No access code? Skip this — use Option B (your own email) instead.</span>';
+    desc.innerHTML = 'From your access code — lets the digest send email without any account setup on your part<br><span style="font-size:11px;color:var(--gold-dark);">No access code? Skip this — use Option B (your own email) instead.</span>';
   }
 }
 
@@ -1442,7 +1445,7 @@ async function aiSuggestPeople(){
     `<span class="chip chip-gold" style="cursor:pointer;" onclick="addColleague(this, '${name.replace(/'/g, "\\'")}')">${escapeHtml(name)} (${coauthors[name]})</span>`
   ).join('');
 
-  resultsEl.innerHTML = `<div style="font-size:11px;color:#8a6f00;margin-bottom:6px;font-weight:600;">Co-authors from your publications (${coauthorNames.length} found) &mdash; click to add</div>`
+  resultsEl.innerHTML = `<div style="font-size:11px;color:var(--gold-dark);margin-bottom:6px;font-weight:600;">Co-authors from your publications (${coauthorNames.length} found) &mdash; click to add</div>`
     + `<div class="chip-group">${chipsHtml}</div>`
     + (coauthorNames.length > 10 ? `<div class="section-desc" style="margin-top:8px;cursor:pointer;color:var(--pine);text-decoration:underline;" onclick="showAllCoauthors()">Show all ${coauthorNames.length} &#x2193;</div><div id="extra-coauthors" style="display:none;"><div class="chip-group" style="margin-top:4px;">${coauthorNames.slice(10).map(name => `<span class="chip chip-gold" style="cursor:pointer;" onclick="addColleague(this, '${name.replace(/'/g, "\\'")}')">${escapeHtml(name)} (${coauthors[name]})</span>`).join('')}</div></div>` : '')
     + `<div style="margin-top:6px;"><button class="btn-clear" onclick="document.getElementById('ai-people-results').style.display='none'">Hide suggestions</button></div>`;
@@ -1899,7 +1902,7 @@ async function renderCategories() {
     }
     initCatChips();
   } catch(e) {
-    container.innerHTML = '<div style="padding:12px;background:#FFF0F0;border:1px solid #e8b4b4;border-radius:6px;color:#C0392B;font-size:12px;">Could not load categories. <span style="text-decoration:underline;cursor:pointer;" onclick="renderCategories()">Try again</span> or reload the page.</div>';
+    container.innerHTML = '<div style="padding:12px;background:var(--alert-red-wash);border:1px solid #e8b4b4;border-radius:6px;color:var(--alert-red);font-size:12px;">Could not load categories. <span style="text-decoration:underline;cursor:pointer;" onclick="renderCategories()">Try again</span> or reload the page.</div>';
   }
 }
 
