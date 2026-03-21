@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import sys
+
 from digest import (
     analyse_papers,
     apply_feedback_bias,
@@ -23,6 +25,7 @@ from digest import (
     pre_filter,
     render_html,
     send_email,
+    send_failure_report,
 )
 from setup.data import ASTRO_MINI_TRACKS, AU_STUDENT_TELESCOPE_KEYWORDS
 from setup.student_presets import build_au_student_config
@@ -387,4 +390,19 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception as _exc:
+        import traceback
+        _tb = traceback.format_exc()
+        print(f"\n❌ Unhandled exception in student digest pipeline:\n{_tb}", file=sys.stderr)
+        # Best-effort failure notification using base config recipient (admin email)
+        try:
+            _admin_config = build_student_base_config()
+            _admin_config["recipient_email"] = os.environ.get("RECIPIENT_EMAIL", "").strip()
+            send_failure_report(_admin_config if _admin_config["recipient_email"] else None, _tb)
+        except Exception as _report_exc:
+            print(f"⚠️  Could not send failure report: {_report_exc}", file=sys.stderr)
+        raise SystemExit(1) from None

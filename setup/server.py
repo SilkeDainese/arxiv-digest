@@ -20,7 +20,7 @@ import urllib.request
 from pathlib import Path
 
 import yaml
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, render_template_string, request, send_from_directory
 
 # Allow imports from the project root (one level up from setup/)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -59,6 +59,118 @@ except Exception:
 # ─────────────────────────────────────────────────────────────
 
 app = Flask(__name__, static_folder=None)
+
+# ─────────────────────────────────────────────────────────────
+#  Branded error page template (inline, no external deps)
+# ─────────────────────────────────────────────────────────────
+
+_ERROR_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arXiv Digest Setup — {{ title }}</title>
+<style>
+  body { margin:0; font-family:'IBM Plex Sans',-apple-system,sans-serif;
+         background:#F6F5F2; color:#2B2B2B; min-height:100vh;
+         display:flex; flex-direction:column; }
+  header { background:#2F4F3E; border-bottom:3px solid #EBC944;
+           padding:14px 32px; }
+  header h1 { margin:0; font-family:Georgia,serif; color:white;
+              font-size:22px; font-weight:normal; }
+  header p  { margin:2px 0 0; font-size:10px; color:rgba(255,255,255,0.5);
+              text-transform:uppercase; letter-spacing:.1em; }
+  main { flex:1; display:flex; align-items:center; justify-content:center;
+         padding:40px 20px; }
+  .card { background:white; border:1px solid #D8D6D0; border-radius:10px;
+          padding:36px 40px; max-width:480px; width:100%; }
+  .code { font-size:48px; font-weight:700; color:#2F4F3E;
+          font-family:Georgia,serif; line-height:1; margin-bottom:8px; }
+  h2 { margin:0 0 12px; font-size:20px; font-family:Georgia,serif;
+       font-weight:normal; color:#2B2B2B; }
+  p  { margin:0 0 8px; font-size:14px; color:#6A6A66; line-height:1.6; }
+  .suggestions { margin:20px 0 0; padding:16px; background:#EDF2EF;
+                 border-radius:6px; }
+  .suggestions p { margin:0; font-size:13px; color:#2F4F3E; }
+  .suggestions ul { margin:8px 0 0; padding-left:20px;
+                    font-size:13px; color:#3D6B52; line-height:1.8; }
+  .back { display:inline-block; margin-top:24px; padding:10px 20px;
+          background:#2F4F3E; color:white; border-radius:6px;
+          text-decoration:none; font-size:13px; }
+  .back:hover { background:#3D6B52; }
+</style>
+</head>
+<body>
+<header>
+  <h1>arXiv Digest Setup</h1>
+  <p>Built by Silke S. Dainese</p>
+</header>
+<main>
+  <div class="card">
+    <div class="code">{{ code }}</div>
+    <h2>{{ title }}</h2>
+    <p>{{ message }}</p>
+    <div class="suggestions">
+      <p>What you can try:</p>
+      <ul>
+        {% for tip in tips %}<li>{{ tip }}</li>{% endfor %}
+      </ul>
+    </div>
+    <a class="back" href="/">&#x2190; Back to setup</a>
+  </div>
+</main>
+</body>
+</html>"""
+
+
+def _error_page(code: int, title: str, message: str, tips: list[str]) -> tuple:
+    html = render_template_string(
+        _ERROR_PAGE, code=code, title=title, message=message, tips=tips
+    )
+    return html, code
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return _error_page(
+        404,
+        "Page not found",
+        "The page you requested doesn't exist.",
+        [
+            "Check the URL and try again.",
+            "Go back to setup and start from there.",
+            "If you followed a link, it may be outdated.",
+        ],
+    )
+
+
+@app.errorhandler(408)
+def request_timeout(e):
+    return _error_page(
+        408,
+        "Request timed out",
+        "The server took too long to respond. This is usually a temporary issue.",
+        [
+            "Refresh the page and try again.",
+            "Check your internet connection.",
+            "The ORCID or arXiv API may be slow — wait a moment and retry.",
+        ],
+    )
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return _error_page(
+        500,
+        "Something went wrong",
+        "An unexpected error occurred on the server. This isn't your fault.",
+        [
+            "Refresh the page and try again.",
+            "If the problem persists, check that all required packages are installed.",
+            "Contact the setup maintainer if this keeps happening.",
+        ],
+    )
+
 
 _ORCID_ID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
@@ -378,12 +490,18 @@ def orcid_lookup():
         return jsonify({"error": "Invalid ORCID ID format (expected 0000-0000-0000-0000)"}), 400
 
     # Fetch person
-    name, institution, person_err = fetch_orcid_person(orcid_id)
+    try:
+        name, institution, person_err = fetch_orcid_person(orcid_id)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ORCID lookup failed: {exc}"}), 502
     if person_err:
-        return jsonify({"error": person_err}), 404
+        return jsonify({"ok": False, "error": person_err}), 404
 
     # Fetch works
-    keywords, titles, works_meta, coauthor_map, coauthor_counts, works_err = fetch_orcid_works(orcid_id)
+    try:
+        keywords, titles, works_meta, coauthor_map, coauthor_counts, works_err = fetch_orcid_works(orcid_id)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Could not fetch publications: {exc}"}), 502
 
     # Generate name match patterns
     self_match = _name_match_patterns(name) if name else []
@@ -395,7 +513,10 @@ def orcid_lookup():
     # Generate research summary from titles
     research_description = ""
     if titles:
-        research_description = _summarise_research(titles, gemini_key, anthropic_key)
+        try:
+            research_description = _summarise_research(titles, gemini_key, anthropic_key)
+        except Exception:
+            research_description = ""  # non-fatal — UI can still show manual fields
 
     return jsonify({
         "name": name,
@@ -436,12 +557,20 @@ def ai_suggest():
     anthropic_key = data.get("anthropic_key", "")
 
     if not text:
-        return jsonify({"error": "research_description is required"}), 400
+        return jsonify({"ok": False, "error": "research_description is required"}), 400
 
-    categories = _suggest_categories(text, gemini_key, anthropic_key)
-    keywords = _suggest_keywords(text, orcid_keywords, gemini_key, anthropic_key)
+    try:
+        categories = _suggest_categories(text, gemini_key, anthropic_key)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Category suggestion failed: {exc}"}), 502
+
+    try:
+        keywords = _suggest_keywords(text, orcid_keywords, gemini_key, anthropic_key)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Keyword suggestion failed: {exc}"}), 502
 
     return jsonify({
+        "ok": True,
         "categories": categories,
         "keywords": keywords,
     })
@@ -506,7 +635,10 @@ def config_generate():
     if data.get("min_score"):
         config["min_score"] = data["min_score"]
 
-    config_yaml = yaml.dump(config, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    try:
+        config_yaml = yaml.dump(config, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Could not serialise config: {exc}"}), 500
 
     # Build cron expression
     cron_map = {
@@ -517,6 +649,7 @@ def config_generate():
     cron_expr = cron_map.get(schedule, f"0 {send_hour} * * 1,3,5")
 
     return jsonify({
+        "ok": True,
         "config_yaml": config_yaml,
         "cron_expr": cron_expr,
     })
@@ -647,9 +780,11 @@ def students_register():
         except json.JSONDecodeError:
             error_payload = {}
         message = str(error_payload.get("error") or body or exc.reason)
-        return jsonify({"error": message}), exc.code
+        return jsonify({"ok": False, "error": message}), exc.code
     except urllib.error.URLError as exc:
-        return jsonify({"error": f"Could not reach relay: {exc.reason}"}), 502
+        return jsonify({"ok": False, "error": f"Could not reach relay: {exc.reason}"}), 502
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Registration failed: {exc}"}), 500
 
 
 # ─────────────────────────────────────────────────────────────

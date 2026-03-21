@@ -34,13 +34,13 @@ class handler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(content_length))
         except (json.JSONDecodeError, ValueError):
-            self._respond(400, {"error": "invalid JSON"})
+            self._respond(400, {"ok": False, "error": "invalid JSON"})
             return
 
         # ── Validate token ──
         token = body.get("token", "")
         if not RELAY_TOKEN or token != RELAY_TOKEN:
-            self._respond(403, {"error": "invalid token"})
+            self._respond(403, {"ok": False, "error": "invalid token"})
             return
 
         # ── Extract fields ──
@@ -53,16 +53,16 @@ class handler(BaseHTTPRequestHandler):
             recipients = [r.strip() for r in recipients.split(",") if r.strip()]
 
         if not recipients or not html or not subject:
-            self._respond(400, {"error": "missing recipients, subject, or html"})
+            self._respond(400, {"ok": False, "error": "missing recipients, subject, or html"})
             return
 
         if len(recipients) > MAX_RECIPIENTS:
-            self._respond(400, {"error": f"max {MAX_RECIPIENTS} recipients"})
+            self._respond(400, {"ok": False, "error": f"max {MAX_RECIPIENTS} recipients"})
             return
 
         # ── Send via Gmail SMTP ──
         if not SMTP_USER or not SMTP_PASSWORD:
-            self._respond(500, {"error": "relay SMTP not configured"})
+            self._respond(500, {"ok": False, "error": "relay SMTP not configured"})
             return
 
         msg = MIMEMultipart("alternative")
@@ -81,9 +81,12 @@ class handler(BaseHTTPRequestHandler):
                 server.sendmail(SMTP_USER, recipients, msg.as_bytes())
             self._respond(200, {"ok": True, "sent_to": len(recipients)})
         except smtplib.SMTPAuthenticationError:
-            self._respond(500, {"error": "SMTP auth failed"})
+            self._respond(500, {"ok": False, "error": "SMTP auth failed"})
         except Exception as e:
-            self._respond(500, {"error": str(e)})
+            # Log server-side, return clean message (no stack trace to caller)
+            import sys
+            print(f"[relay/send] SMTP error: {e}", file=sys.stderr)
+            self._respond(500, {"ok": False, "error": "email delivery failed"})
 
     def do_GET(self):
         self._respond(200, {"status": "arXiv Digest relay is running"})

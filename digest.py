@@ -1967,6 +1967,64 @@ def send_email(html: str, paper_count: int, date_str: str, config: dict[str, Any
 
 
 # ─────────────────────────────────────────────────────────────
+#  FAILURE NOTIFICATIONS
+# ─────────────────────────────────────────────────────────────
+
+def send_failure_report(config: dict[str, Any] | None, error_summary: str) -> None:
+    """Send a plain-text failure email to the configured recipient.
+
+    Tries direct SMTP first (works even if the relay is down), then falls back
+    to the relay.  If email is not configured at all, prints to stderr only.
+    """
+    recipient = (config or {}).get("recipient_email", "")
+    if isinstance(recipient, list):
+        recipient = recipient[0] if recipient else ""
+    recipient = (recipient or "").strip()
+    if not recipient:
+        print("⚠️  No recipient_email configured — failure report printed to stderr only.", file=sys.stderr)
+        return
+
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    subject = f"⚠️ arXiv Digest failed — {date_str}"
+    body = (
+        f"Your arXiv Digest pipeline failed on {date_str}.\n\n"
+        f"Error details:\n{error_summary}\n\n"
+        "Check the GitHub Actions run log for the full traceback.\n"
+        "If this keeps happening, open an issue: "
+        "https://github.com/SilkeDainese/arxiv-digest/issues\n"
+    )
+
+    smtp_user = os.environ.get("SMTP_USER", "").strip() or os.environ.get("GMAIL_USER", "").strip()
+    smtp_password = os.environ.get("SMTP_PASSWORD", "").strip() or os.environ.get("GMAIL_APP_PASSWORD", "").strip()
+    smtp_server = (config or {}).get("smtp_server", "smtp.gmail.com")
+    smtp_port = int((config or {}).get("smtp_port", 587))
+    digest_name = (config or {}).get("digest_name", "arXiv Digest")
+
+    # Try direct SMTP first — works even when the relay is down
+    if smtp_user and smtp_password:
+        ok = _send_via_smtp(
+            [recipient], subject, body, body,
+            smtp_user, smtp_password, smtp_server, smtp_port, digest_name,
+        )
+        if ok:
+            return
+        print("⚠️  Direct SMTP failure notification failed — trying relay.", file=sys.stderr)
+
+    # Relay fallback
+    relay_token = _get_relay_token()
+    if relay_token:
+        _send_via_relay([recipient], subject, body, body)
+        return
+
+    print(
+        f"⚠️  Could not send failure notification (no SMTP or relay configured).\n"
+        f"    Subject: {subject}\n"
+        f"    Body: {body}",
+        file=sys.stderr,
+    )
+
+
+# ─────────────────────────────────────────────────────────────
 #  MAIN
 # ─────────────────────────────────────────────────────────────
 
@@ -2075,4 +2133,23 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    _config_for_failure: dict[str, Any] | None = None
+    try:
+        # Load config early so failure reports can reach the right inbox
+        if CONFIG_PATH.exists() or CONFIG_EXAMPLE_PATH.exists():
+            try:
+                _config_for_failure = load_config()
+            except Exception:
+                pass
+        main()
+    except SystemExit:
+        raise
+    except Exception as _exc:
+        import traceback
+        _tb = traceback.format_exc()
+        print(f"\n❌ Unhandled exception in digest pipeline:\n{_tb}", file=sys.stderr)
+        try:
+            send_failure_report(_config_for_failure, _tb)
+        except Exception as _report_exc:
+            print(f"⚠️  Could not send failure report: {_report_exc}", file=sys.stderr)
+        raise SystemExit(1) from None

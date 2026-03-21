@@ -200,7 +200,7 @@ def _dispatch(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         return 200, _handle_aggregate(body)
     if action == "stats":
         return 200, _handle_stats(body)
-    return 400, {"error": "unknown action"}
+    return 400, {"ok": False, "error": "unknown action"}
 
 
 class handler(BaseHTTPRequestHandler):
@@ -211,18 +211,21 @@ class handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
         except (json.JSONDecodeError, ValueError):
-            self._respond(400, {"error": "invalid JSON"})
+            self._respond(400, {"ok": False, "error": "invalid JSON"})
             return
 
         try:
             status, payload = _dispatch(body)
             self._respond(status, payload)
         except PermissionError as exc:
-            self._respond(403, {"error": str(exc)})
+            self._respond(403, {"ok": False, "error": str(exc)})
         except ValueError as exc:
-            self._respond(400, {"error": str(exc)})
+            self._respond(400, {"ok": False, "error": str(exc)})
         except Exception as exc:
-            self._respond(500, {"error": str(exc)})
+            import sys
+            import traceback
+            print(f"[relay/feedback] Unhandled error: {traceback.format_exc()}", file=sys.stderr)
+            self._respond(500, {"ok": False, "error": "internal server error"})
 
     def _respond(self, status: int, body: dict[str, Any]):
         payload = json.dumps(body).encode("utf-8")
