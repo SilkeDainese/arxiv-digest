@@ -478,7 +478,7 @@ def categories():
 def orcid_lookup():
     """Look up ORCID profile: person info + publications + coauthors."""
     if not _PURE_AVAILABLE:
-        return jsonify({"error": "ORCID lookup not available (missing dependencies)"}), 503
+        return jsonify({"error": "ORCID lookup is temporarily unavailable. You can fill in your details manually below."}), 503
 
     data = request.get_json(force=True)
     orcid_id = data.get("orcid_id", "").strip()
@@ -492,6 +492,8 @@ def orcid_lookup():
     # Fetch person
     try:
         name, institution, person_err = fetch_orcid_person(orcid_id)
+    except (TimeoutError, OSError):
+        return jsonify({"ok": False, "error": "Couldn't reach ORCID right now — try again in a moment, or fill in your details manually."}), 503
     except Exception as exc:
         return jsonify({"ok": False, "error": f"ORCID lookup failed: {exc}"}), 502
     if person_err:
@@ -500,6 +502,8 @@ def orcid_lookup():
     # Fetch works
     try:
         keywords, titles, works_meta, coauthor_map, coauthor_counts, works_err = fetch_orcid_works(orcid_id)
+    except (TimeoutError, OSError):
+        return jsonify({"ok": False, "error": "Couldn't reach ORCID right now — try again in a moment, or fill in your details manually."}), 503
     except Exception as exc:
         return jsonify({"ok": False, "error": f"Could not fetch publications: {exc}"}), 502
 

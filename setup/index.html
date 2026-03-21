@@ -283,7 +283,7 @@
 
 <div class="ai-toggle-bar">
   <div class="ai-toggle-row">
-    <div class="ai-toggle-label">AI-assisted setup<small>Add an AI key to auto-fill categories, keywords, and people from your publications.</small></div>
+    <div class="ai-toggle-label">AI scoring<small>Add a free AI key to auto-fill your profile AND score papers daily. Without it, keyword matching still works.</small></div>
     <label class="toggle-switch"><input type="checkbox" id="ai-toggle" onchange="toggleAI()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
   </div>
   <div class="ai-key-row" id="ai-key-row" style="align-items:flex-start;">
@@ -321,6 +321,7 @@
   <div class="step" id="step-1">
     <div class="step-header" onclick="toggleStep('step-1')"><span class="step-num">1</span><span class="step-title">About You</span><span class="step-summary" id="sum-step-1"></span><span class="step-badge">optional</span><span class="step-chevron">&#x276F;</span></div>
     <div class="step-body">
+      <div style="background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pine);">Already set up? <span style="text-decoration:underline;cursor:pointer;" onclick="openUpload()">Upload your config.yaml to edit your settings.</span></div>
       <p>Enter your ORCID to auto-fill your profile, research description, and more. Or skip and fill manually.</p>
 
       <details style="font-size:11px;color:var(--warm-grey);margin:-4px 0 12px;">
@@ -493,8 +494,9 @@
         <button class="btn-secondary" style="flex-shrink:0;padding:7px 14px;" onclick="addColleagueManual(document.getElementById('coll-input').value)">Add</button>
       </div>
 
-      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-        <button class="btn-secondary" onclick="aiSuggestPeople()" id="ai-suggest-people-btn">Suggest from co-authors</button>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="aiSuggestPeople()" id="ai-suggest-people-btn" disabled style="opacity:.45;cursor:not-allowed;">Suggest from co-authors</button>
+        <span id="ai-suggest-people-note" style="font-size:11px;color:var(--warm-grey);font-style:italic;">(requires ORCID lookup in Step 1)</span>
         <span id="ai-people-status" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--pine);display:none;"></span>
       </div>
 
@@ -625,9 +627,9 @@
 
       <!-- Self-hosting options (collapsed) -->
       <div style="margin-top:8px;">
-        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'selfhost-options')">Self-hosting options &#x2193;</span>
+        <span class="section-desc" style="cursor:pointer;color:var(--pine);text-decoration:underline;margin:0;" onclick="toggleAdvanced(this,'selfhost-options')">Email settings (Gmail / Outlook) &#x2193;</span>
         <div id="selfhost-options" style="display:none;margin-top:8px;padding:12px;background:var(--ash-white);border:1px solid var(--card-border);border-radius:6px;">
-          <div class="section-desc" style="margin:0 0 8px;">Only relevant if you're running your own email. Most users can skip this.</div>
+          <div class="section-desc" style="margin:0 0 8px;">Only needed if you're sending digests from your own email account, without a relay token.</div>
           <div class="field-row">
             <div class="field"><label>Email provider</label>
               <div class="radio-group" style="margin:4px 0 0;"><div class="radio-option active" onclick="setRadio(this)" style="padding:8px;"><div style="font-weight:600;font-size:12px;">Gmail</div></div><div class="radio-option" onclick="setRadio(this)" style="padding:8px;"><div style="font-weight:600;font-size:12px;">Outlook</div></div></div>
@@ -663,12 +665,15 @@
       <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">
         <strong style="color:var(--ash-black);">Fork</strong> = your own private copy of this project on GitHub. The digest runs from your copy, and any changes you make won't affect anyone else.
       </div>
+      <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">
+        <strong style="color:var(--ash-black);">Note:</strong> GitHub forks are public by default. Your config (including your email) will be visible. To make it private: Settings &rarr; Danger Zone &rarr; Change visibility.
+      </div>
     </div>
   </div>
 
   <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
     <span class="step-num" style="width:22px;height:22px;font-size:11px;">2</span>
-    <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes.</div></div>
+    <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes.</div><div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">The file must be named exactly <code style="font-family:'DM Mono',monospace;">config.yaml</code> (not <code style="font-family:'DM Mono',monospace;">config (1).yaml</code> — check your Downloads folder) and placed in the root of your repository, not inside any folder.</div></div>
   </div>
 
   <div style="display:flex;gap:10px;margin-bottom:4px;align-items:flex-start;">
@@ -766,6 +771,7 @@
   <div class="step" id="mini-1">
     <div class="step-header" onclick="toggleStep('mini-1')"><span class="step-num">1</span><span class="step-title">Keywords &amp; Interests</span><span class="step-summary" id="sum-mini-1"></span><span class="step-chevron">&#x276F;</span></div>
     <div class="step-body">
+      <div style="background:var(--pine-wash);border:1px solid #c0d4c6;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pine);">Already set up? <span style="text-decoration:underline;cursor:pointer;" onclick="openUpload()">Upload your config.yaml to edit your settings.</span></div>
       <p>What topics should your digest cover? Add keywords and set how important each one is.</p>
 
       <div class="section-label">Your keywords</div>
@@ -797,10 +803,15 @@
       <p>People whose papers you always want to see, regardless of topic. Labmates, advisors, collaborators.</p>
 
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div class="chip-group" style="flex:1;">
-          <span class="chip chip-ghost">+ add colleague</span>
+        <div class="chip-group" id="mini-coll-chips" style="flex:1;">
+          <span class="chip chip-ghost" onclick="document.getElementById('mini-coll-input').focus()">+ add colleague</span>
         </div>
-        <button class="btn-clear" style="margin-left:8px;display:none;">Clear</button>
+        <button class="btn-clear" id="mini-coll-clear-btn" onclick="clearMiniColleagues()" style="margin-left:8px;display:none;">Clear</button>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+        <input type="text" id="mini-coll-input" class="ai-key-input" placeholder="Add a person (e.g. Smith, J)..." style="flex:3;border-radius:6px;" autocomplete="off" onkeydown="if(event.key==='Enter'){addMiniColleague(this.value);event.preventDefault();}">
+        <button class="btn-secondary" style="flex-shrink:0;padding:7px 14px;" onclick="addMiniColleague(document.getElementById('mini-coll-input').value)">Add</button>
       </div>
 
       <div class="explainer" style="margin-top:12px;">
@@ -815,7 +826,7 @@
   <div class="step collapsed" id="mini-3">
     <div class="step-header" onclick="toggleStep('mini-3')"><span class="step-num">3</span><span class="step-title">Schedule &amp; Download</span><span class="step-summary" id="sum-mini-3"></span><span class="step-chevron">&#x276F;</span></div>
     <div class="step-body">
-      <p>How many papers and how often. Send time is randomised to spread load.</p>
+      <p>How many papers and how often.</p>
 
       <div class="section-label">Digest size</div>
       <div class="section-desc">Controls the volume of each email.</div>
@@ -833,13 +844,13 @@
       </div>
 
       <div class="explainer" style="margin-top:8px;">
-        <strong>Send time</strong> is assigned randomly (between 06:00–09:00 UTC) to avoid everyone hitting the arXiv API at once.
+        <strong>Default send time:</strong> 07:00 UTC (~09:00 Danish time).
       </div>
 
       <div class="download-area" style="margin-top:16px;">
         <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;margin-bottom:4px;">Your config is ready</div>
         <div style="font-size:12px;color:var(--warm-grey);margin-bottom:4px;">2 keywords &middot; 0 colleagues</div>
-        <div style="font-size:11px;color:var(--warm-grey);margin-bottom:12px;" id="mini-summary">Highlights &middot; Mon/Wed/Fri &middot; Random send time</div>
+        <div style="font-size:11px;color:var(--warm-grey);margin-bottom:12px;" id="mini-summary">Highlights &middot; Mon/Wed/Fri &middot; 07:00 UTC</div>
         <button class="download-btn" onclick="downloadMiniConfig()">Download config.yaml</button>
       </div>
     </div>
@@ -855,11 +866,12 @@
         <div style="font-size:13px;font-weight:600;">Fork the repo</div>
         <div style="font-size:12px;color:var(--warm-grey);margin-top:2px;"><a href="https://github.com/SilkeDainese/arxiv-digest" target="_blank" style="color:var(--pine);">SilkeDainese/arxiv-digest</a> &rarr; Fork</div>
         <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">Fork</strong> = your own private copy of this project on GitHub. Changes you make won't affect anyone else.</div>
+        <div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;"><strong style="color:var(--ash-black);">Note:</strong> GitHub forks are public by default. Your config (including your email) will be visible. To make it private: Settings &rarr; Danger Zone &rarr; Change visibility.</div>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
       <span class="step-num" style="width:22px;height:22px;font-size:11px;">2</span>
-      <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes. Come back and re-run setup anytime.</div></div>
+      <div><div style="font-size:13px;font-weight:600;">Upload config.yaml</div><div style="font-size:12px;color:var(--warm-grey);margin-top:2px;">In your fork: Add file &rarr; Upload files &rarr; drop config.yaml &rarr; Commit changes. Come back and re-run setup anytime.</div><div style="font-size:12px;color:#888;margin-top:4px;line-height:1.5;">The file must be named exactly <code style="font-family:'DM Mono',monospace;">config.yaml</code> (not <code style="font-family:'DM Mono',monospace;">config (1).yaml</code> — check your Downloads folder) and placed in the root of your repository, not inside any folder.</div></div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">
       <span class="step-num" style="width:22px;height:22px;font-size:11px;">3</span>
@@ -1078,8 +1090,15 @@ function toggleAI(){
   document.getElementById('ai-key-row').classList.toggle('show', on);
   const ab = document.getElementById('autofill-bar');
   if(ab){ ab.style.opacity = on ? '1' : '.4'; ab.style.pointerEvents = on ? '' : 'none'; }
+  const autofillDesc = document.getElementById('autofill-desc');
+  if(autofillDesc && !state.orcidData) {
+    autofillDesc.textContent = on
+      ? 'Suggests categories and keywords from your research description.'
+      : 'Suggests categories and keywords using basic matching (enable AI above for better results).';
+  }
   const sp = document.getElementById('ai-suggest-people-btn');
-  if(sp){ sp.style.opacity = on ? '1' : '.5'; sp.disabled = !on; }
+  if(sp && !state.orcidData){ sp.style.opacity = on ? '.45' : '.45'; sp.disabled = true; }
+  else if(sp){ sp.style.opacity = on ? '1' : '.5'; sp.disabled = !on; }
 
   // Validate key if toggled on
   if(on) validateAIKey();
@@ -1205,6 +1224,12 @@ async function simulateOrcidV2(){
 
     state.orcidData = data;
     state.keywords = data.keywords || {};
+
+    // Enable "Suggest from co-authors" now that ORCID data is loaded
+    const suggestBtn = document.getElementById('ai-suggest-people-btn');
+    const suggestNote = document.getElementById('ai-suggest-people-note');
+    if(suggestBtn) { suggestBtn.disabled = false; suggestBtn.style.opacity = ''; suggestBtn.style.cursor = ''; }
+    if(suggestNote) suggestNote.style.display = 'none';
 
     // Fill the UI
     document.getElementById('orcid-result').style.display = 'block';
@@ -1878,7 +1903,7 @@ async function renderCategories() {
     }
     initCatChips();
   } catch(e) {
-    container.innerHTML = '<div style="padding:12px;background:#FFF0F0;border:1px solid #e8b4b4;border-radius:6px;color:#C0392B;font-size:12px;">Could not load categories. Reload the page to try again.</div>';
+    container.innerHTML = '<div style="padding:12px;background:#FFF0F0;border:1px solid #e8b4b4;border-radius:6px;color:#C0392B;font-size:12px;">Could not load categories. <span style="text-decoration:underline;cursor:pointer;" onclick="renderCategories()">Try again</span> or reload the page.</div>';
   }
 }
 
@@ -1978,6 +2003,49 @@ function syncResearchDesc(sourceId) {
   const el = document.getElementById(id);
   if(el) el.addEventListener('blur', () => syncResearchDesc(id));
 });
+
+// ── Mini flow colleague helpers ──
+function addMiniColleague(value) {
+  const name = (value || '').trim();
+  if(!name) return;
+  const miniChips = document.getElementById('mini-coll-chips');
+  if(!miniChips) return;
+  // Check duplicate
+  const existing = [...miniChips.querySelectorAll('.chip-pine')];
+  if(existing.some(c => c.textContent.replace(/\u00d7/g,'').trim() === name)) {
+    for(const c of existing) { if(c.textContent.replace(/\u00d7/g,'').trim() === name) { c.style.animation='none'; void c.offsetWidth; c.style.animation='chipPulse 0.8s ease'; break; } }
+    return;
+  }
+  if(!state.colleagues.includes(name)) state.colleagues.push(name);
+  const ghost = miniChips.querySelector('.chip-ghost');
+  const chip = document.createElement('span');
+  chip.className = 'chip chip-pine';
+  const safeN = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  chip.innerHTML = `${escapeHtml(name)} <span class="remove" onclick="removeMiniColleague(this,'${safeN}')">&times;</span>`;
+  miniChips.insertBefore(chip, ghost);
+  const clearBtn = document.getElementById('mini-coll-clear-btn');
+  if(clearBtn) clearBtn.style.display = '';
+  const inp = document.getElementById('mini-coll-input');
+  if(inp) inp.value = '';
+}
+
+function removeMiniColleague(removeEl, name) {
+  removeEl.parentElement.remove();
+  state.colleagues = state.colleagues.filter(c => c !== name);
+  const miniChips = document.getElementById('mini-coll-chips');
+  if(miniChips && !miniChips.querySelectorAll('.chip-pine').length) {
+    const clearBtn = document.getElementById('mini-coll-clear-btn');
+    if(clearBtn) clearBtn.style.display = 'none';
+  }
+}
+
+function clearMiniColleagues() {
+  const chips = document.getElementById('mini-coll-chips');
+  if(chips) chips.innerHTML = '<span class="chip chip-ghost" onclick="document.getElementById(\'mini-coll-input\').focus()">+ add colleague</span>';
+  state.colleagues = [];
+  const btn = document.getElementById('mini-coll-clear-btn');
+  if(btn) btn.style.display = 'none';
+}
 
 // ── Init on load ──
 renderCategories();

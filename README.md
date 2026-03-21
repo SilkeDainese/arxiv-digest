@@ -26,7 +26,7 @@ I built this during my PhD in astronomy at Aarhus University to stay on top of n
 <details>
 <summary><b>AU Students — there's an easier setup for you</b></summary>
 
-**[Sign up here →](https://arxiv-digest-relay.vercel.app/api/students)** — no GitHub, no config files, no API keys (passwords to AI services). Just your AU email and a password. AI scoring and email delivery are handled for you.
+AU students can subscribe through a separate signup page — contact the course instructor for the link. No GitHub, no config files, no API keys (passwords to AI services). Just your AU email and a password. AI scoring and email delivery are handled for you.
 
 Pick from pre-built interest packages (exoplanets, stars, galaxies, cosmology, and more) and get a weekly digest. You can update your interests or unsubscribe anytime.
 
@@ -59,8 +59,8 @@ Go to your fork → **Settings → Secrets and variables → Actions → New rep
 | Secret name | What to put there | Required? |
 |---|---|---|
 | `RECIPIENT_EMAIL` | Your email address | Yes |
-| `DIGEST_RELAY_TOKEN` | The token from the setup wizard (lets the relay server send emails on your behalf — no email setup needed) | Option A |
-| `SMTP_USER` + `SMTP_PASSWORD` | Your email address + an [app password](https://myaccount.google.com/apppasswords) (a special one-time password Gmail/Outlook generates so you don't expose your real password) | Option B |
+| `DIGEST_RELAY_TOKEN` | If you got an access code from a colleague: enter it in the setup wizard's Access Code button — the token appears automatically. No access code? Skip this row and use Option B (your own email) instead. | Option A |
+| `SMTP_USER` + `SMTP_PASSWORD` | Your email address + an app password (a special one-time password your email provider generates so you don't expose your real password). **Gmail users:** You need 2-Step Verification enabled first — [enable it here](https://myaccount.google.com/signinoptions/two-step-verification). Then [generate an app password](https://myaccount.google.com/apppasswords). **Outlook users:** also add `smtp_server: "smtp.office365.com"` to your config.yaml. | Option B |
 | `GEMINI_API_KEY` | A free API key (a password that lets the digest use Google's AI on your behalf) from [aistudio.google.com](https://aistudio.google.com/apikey) — optional, improves scoring | Optional |
 | `ANTHROPIC_API_KEY` | A paid API key for Claude — optional, used if you prefer it over Gemini | Optional |
 
