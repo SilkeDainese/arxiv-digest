@@ -115,6 +115,7 @@ Rules:
 - No LaTeX, no symbols like $M_\\odot$ — write "solar mass" instead
 - No hedging ("struggles to", "carefully calibrated") — just state the result
 - Write like a smart friend explaining over coffee, not like an abstract
+- Never start a sentence with "Researchers", "Scientists", "The authors", "A team", or "The study" — lead with what was found or what is new
 
 Papers:
 {json.dumps(titles_and_summaries, indent=2)}

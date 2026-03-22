@@ -1027,7 +1027,7 @@ Feedback signal: {paper.get('feedback_bias', 0)} (positive means similar keyword
 Respond with ONLY a valid JSON object (no markdown, no backticks):
 {{
   "relevance_score": <integer 1-10>,
-  "plain_summary": "<2-3 sentences explaining what they did, like explaining to a smart friend at a pub>",
+  "plain_summary": "<2-3 sentences written peer-to-peer, as one scientist summarising for another — lead with the result or method, not the researchers. Never start with 'Researchers', 'The authors', 'This paper', 'A team', or 'Scientists'. Assume domain knowledge. Example good style: 'New ML approach for stellar Teff from high-res spectra — synthetic MARCS training, recovers within 50K on APOGEE benchmarks. Struggles below [Fe/H] = -2.'>",
   "why_interesting": "<1-2 sentences on why specifically relevant to {researcher_name}'s work>",
   "emoji": "<one relevant emoji>",
   "highlight_phrase": "<punchy 5-8 word headline>",
