@@ -1363,6 +1363,12 @@ def _one_sentence(text: str) -> str:
     clean = " ".join((text or "").split())
     if not clean:
         return ""
+    # Strip LaTeX math that leaks from abstracts/AI summaries
+    clean = re.sub(r"\$[^$]+\$", "", clean)  # remove $...$ inline math
+    clean = re.sub(r"\\[a-zA-Z]+\{[^}]*\}", "", clean)  # remove \cmd{...}
+    clean = " ".join(clean.split()).strip()  # collapse whitespace
+    if not clean:
+        return ""
     m = re.match(r"^(.+?[.!?])\s", clean)
     sentence = m.group(1) if m else clean
     if len(sentence) > 180:
@@ -1375,7 +1381,12 @@ def _short_title(title: str, max_len: int = 105) -> str:
     t = " ".join((title or "").split())
     if len(t) <= max_len:
         return t
-    return t[: max_len - 3].rstrip() + "..."
+    # Cut at word boundary to avoid mid-word truncation
+    truncated = t[:max_len]
+    last_space = truncated.rfind(" ")
+    if last_space > max_len // 2:
+        truncated = truncated[:last_space]
+    return truncated.rstrip() + "..."
 
 
 def _build_feedback_links(p: dict[str, Any], github_repo: str) -> str:
@@ -1518,16 +1529,22 @@ def detect_au_researchers(papers: list[dict[str, Any]]) -> None:
         paper["au_researcher_authors"] = au_authors
 
 
-def detect_delights(papers: list[dict[str, Any]]) -> None:
+def detect_delights(papers: list[dict[str, Any]], max_per_email: int = 2) -> None:
     """Add cultural wayfinding notes to papers for student digest.
 
     Enriches each paper with a 'delights' list of short notes
-    for Kalam-font rendering. Max 2 per paper, sometimes none.
+    for Kalam-font rendering. Max 1 per paper, max 2 per email.
+    AU affiliation delights always get priority over keyword matches.
     """
-    for paper in papers:
-        delights: list[str] = []
+    email_delight_count = 0
 
-        # AU affiliation delights (highest priority)
+    for paper in papers:
+        paper["delights"] = []
+
+        if email_delight_count >= max_per_email:
+            continue
+
+        # AU affiliation delights (highest priority — always shown)
         if paper.get("is_au_researcher"):
             au_authors = paper.get("au_researcher_authors", [])
             author_affs = paper.get("author_affiliations", {})
@@ -1546,21 +1563,20 @@ def detect_delights(papers: list[dict[str, Any]]) -> None:
             if au_delight is None and au_authors:
                 au_delight = "AU researcher"
             if au_delight:
-                delights.append(au_delight)
+                paper["delights"] = [au_delight]
+                email_delight_count += 1
+                continue  # AU delight is enough for this paper
 
-        # Keyword-based delights from abstract + title
+        if email_delight_count >= max_per_email:
+            continue
+
+        # Keyword-based delights from abstract + title (max 1 per paper)
         text = (paper.get("title", "") + " " + paper.get("abstract", "")).lower()
-        seen_notes: set[str] = set(delights)
         for keyword, note in DELIGHT_KEYWORDS.items():
-            if note in seen_notes:
-                continue
             if keyword.lower() in text:
-                delights.append(note)
-                seen_notes.add(note)
-            if len(delights) >= 2:
+                paper["delights"] = [note]
+                email_delight_count += 1
                 break
-
-        paper["delights"] = delights
 
 
 def _render_student_paper_card(p: dict[str, Any]) -> str:
@@ -1614,7 +1630,7 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
     delight_html = ""
     for delight in p.get("delights", []):
         delight_html += (
-            f'<p style="font-family:\'Kalam\',cursive;font-size:14px;color:{GREEN_HAND};'
+            f'<p style="font-family:\'Kalam\',\'Comic Sans MS\',\'Segoe Print\',cursive;font-size:14px;color:{GREEN_HAND};'
             f'margin:4px 0 0">&#8627; {_esc(delight)}</p>'
         )
 

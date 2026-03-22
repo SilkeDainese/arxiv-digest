@@ -563,38 +563,40 @@ def test_detect_delights_au_affiliation():
     assert any("PhD" in d for d in paper["delights"]), "PhD role should appear in delight"
 
 
-def test_detect_delights_telescope():
-    """Paper mentioning JWST in abstract gets telescope delight."""
+def test_detect_delights_au_telescope():
+    """Paper mentioning SONG telescope gets AU-local delight."""
     from digest import detect_delights
 
     paper = make_paper(
-        abstract="We present new JWST observations of exoplanet atmospheres.",
+        abstract="We present new SONG telescope observations of stellar oscillations.",
     )
     detect_delights([paper])
-    assert "JWST data" in paper["delights"]
+    assert any("SONG" in d for d in paper["delights"])
 
 
-def test_detect_delights_max_two():
-    """Papers matching many keywords still get at most 2 delights."""
+def test_detect_delights_max_per_email():
+    """Delights are capped at 2 across the entire email, not per paper."""
+    from digest import detect_delights
+
+    papers = [
+        make_paper(abstract="SONG telescope data."),
+        make_paper(abstract="Nordic Optical Telescope observations."),
+        make_paper(abstract="Ole Rømer Observatory data."),
+    ]
+    detect_delights(papers)
+    total = sum(len(p["delights"]) for p in papers)
+    assert total <= 2
+
+
+def test_detect_delights_generic_telescopes_not_included():
+    """JWST, TESS, Hubble etc. are NOT delights — too common, not AU-local."""
     from digest import detect_delights
 
     paper = make_paper(
-        abstract="Using JWST, TESS, Kepler, Chandra, and ALMA data we study stars.",
+        abstract="The James Webb Space Telescope (JWST) and TESS observed the target.",
     )
     detect_delights([paper])
-    assert len(paper["delights"]) <= 2
-
-
-def test_detect_delights_no_duplicates():
-    """Synonyms like JWST and James Webb produce only one delight."""
-    from digest import detect_delights
-
-    paper = make_paper(
-        abstract="The James Webb Space Telescope (JWST) observed the target.",
-    )
-    detect_delights([paper])
-    jwst_count = sum(1 for d in paper["delights"] if d == "JWST data")
-    assert jwst_count == 1
+    assert paper["delights"] == []
 
 
 def test_detect_delights_empty_when_no_match():
