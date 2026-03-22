@@ -90,14 +90,20 @@ def rewrite_summaries_for_students(
             "summary": p.get("plain_summary", ""),
         })
 
-    prompt = f"""Rewrite these astronomy paper summaries for 2nd-year university students.
+    prompt = f"""Rewrite these astronomy paper summaries for 2nd-year university physics students.
+
+What they know (completed courses):
+- Stars & Planets: stellar evolution, HR diagrams, exoplanet detection (transits, radial velocity), photometry, spectroscopy basics, binary stars
+- Galaxies & Cosmology (taking now): Milky Way structure, dark matter, black holes in galaxy centers, elliptical/spiral galaxies, Tully-Fisher, galaxy clusters, gravitational lensing, Friedmann equation, expanding universe, cosmological parameters, CMB, Big Bang nucleosynthesis
+
+What they do NOT know: advanced particle physics, quantum field theory, magnetohydrodynamics, numerical methods, statistical mechanics, instrument-specific jargon (pipeline, reduction), most acronyms beyond JWST/HST/ESO
 
 Rules:
 - One sentence each, max 25 words
-- No jargon they wouldn't know (no "superradiance", "ultralight axions", "metallicity", "spectroscopy" without context)
+- Use concepts they know from their courses when possible
+- If the paper topic is outside their knowledge, describe the result in plain language
 - Say what they FOUND or DID, not what method they used
-- If unsure what something means to a student, describe the result plainly
-- No LaTeX, no symbols like $M_\\odot$
+- No LaTeX, no symbols like $M_\\odot$ — write "Sun-like mass" or "solar mass" instead
 - Keep it factual, not dumbed down — just legible
 
 Papers:
