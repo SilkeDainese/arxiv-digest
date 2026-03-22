@@ -396,7 +396,7 @@ def collect_au_student_track_ids() -> list[str]:
                 selected.append(track_id)
         if selected:
             return selected
-        print("Pick at least one package.")
+        print("Pick at least one category.")
 
 
 def build_au_student_terminal_config() -> tuple[str, str]:

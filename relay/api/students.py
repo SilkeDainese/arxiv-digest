@@ -42,6 +42,7 @@ store_pending_token = _registry.store_pending_token
 check_rate_limit = _registry.check_rate_limit
 cleanup_expired_tokens = _registry.cleanup_expired_tokens
 AU_STUDENT_TRACK_LABELS = _registry.AU_STUDENT_TRACK_LABELS
+_SETTINGS_TOKEN_TTL = _registry._SETTINGS_TOKEN_TTL
 
 GITHUB_API = "https://api.github.com"
 STORAGE_GITHUB_TOKEN = os.environ.get("STUDENT_STORAGE_GITHUB_TOKEN", "").strip()
@@ -65,6 +66,12 @@ _ASH_WHITE = "#F6F5F2"
 _CHARCOAL = "#1F1F1F"
 _WARM_GREY = "#6A6A66"
 _ALERT_RED = "#C0392B"
+_CREAM = "#F5F3EF"        # warm cream background
+_WARM_WHITE = "#FFFDF8"   # header text
+_FOOTER_BG = "#F0EDE6"    # footer background
+_SOFT_GREY = "#BBB"       # soft unsubscribe link
+_TERRACOTTA = "#9E5544"   # unsubscribe/danger button
+_GREEN_HAND = "#2C5530"   # Kalam handscribble
 
 
 def _github_request(method: str, url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -165,15 +172,15 @@ def _send_subscribe_confirmation(
         f"Confirm your subscription\n\n"
         f"Click the link below to activate your AU student digest:\n"
         f"{confirm_url}\n\n"
-        f"Your packages: {package_text}\n\n"
+        f"Your categories: {package_text}\n\n"
         f"If you didn't request this, you can safely ignore this email.\n"
     )
     html_body = f"""<!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:0;background:{_ASH_WHITE};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif">
+  <body style="margin:0;padding:0;background:{_CREAM};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif">
     <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto">
-      <tr><td style="background:{_PINE};padding:20px 28px">
-        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:20px;color:white">AU student digest</div>
+      <tr><td style="background:{_PINE};padding:14px 28px">
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;color:{_WARM_WHITE}">AU student digest</div>
       </td></tr>
       <tr><td style="background:white;padding:32px 28px">
         <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:24px;color:{_CHARCOAL};margin:0 0 16px">Confirm your subscription</h1>
@@ -182,11 +189,14 @@ def _send_subscribe_confirmation(
         </p>
         <a href="{html.escape(confirm_url)}" style="display:inline-block;background:{_PINE};color:white;font-size:15px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none">Confirm subscription</a>
         <div style="margin-top:24px;padding:16px;background:#F8F7F4;border-radius:8px">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{_WARM_GREY};margin-bottom:8px">YOUR PACKAGES</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{_WARM_GREY};margin-bottom:8px">YOUR CATEGORIES</div>
           <div style="font-size:14px;color:{_CHARCOAL}">{html.escape(package_text)}</div>
         </div>
         <p style="font-size:13px;color:{_WARM_GREY};margin-top:24px;line-height:1.5">
           If you didn't request this, you can safely ignore this email. The link expires in 1 hour.
+        </p>
+        <p style="font-size:13px;color:#999;margin-top:12px;line-height:1.5">
+          You can change settings or unsubscribe anytime from your digest email.
         </p>
       </td></tr>
     </table>
@@ -213,19 +223,22 @@ def _send_unsubscribe_confirmation(
     )
     html_body = f"""<!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:0;background:{_ASH_WHITE};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif">
+  <body style="margin:0;padding:0;background:{_CREAM};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif">
     <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto">
-      <tr><td style="background:{_PINE};padding:20px 28px">
-        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:20px;color:white">AU student digest</div>
+      <tr><td style="background:{_PINE};padding:14px 28px">
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;color:{_WARM_WHITE}">AU student digest</div>
       </td></tr>
       <tr><td style="background:white;padding:32px 28px">
         <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:24px;color:{_CHARCOAL};margin:0 0 16px">Confirm unsubscribe</h1>
         <p style="font-size:15px;color:{_CHARCOAL};line-height:1.6;margin:0 0 24px">
           Click the button below to stop receiving your weekly arXiv digest.
         </p>
-        <a href="{html.escape(confirm_url)}" style="display:inline-block;background:{_ALERT_RED};color:white;font-size:15px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none">Confirm unsubscribe</a>
+        <a href="{html.escape(confirm_url)}" style="display:inline-block;background:{_TERRACOTTA};color:white;font-size:15px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none">Confirm unsubscribe</a>
         <p style="font-size:13px;color:{_WARM_GREY};margin-top:24px;line-height:1.5">
           If you didn't request this, you can safely ignore this email. The link expires in 1 hour.
+        </p>
+        <p style="font-size:13px;color:#999;margin-top:12px;line-height:1.5">
+          You can change settings or unsubscribe anytime from your digest email.
         </p>
       </td></tr>
     </table>
@@ -366,6 +379,73 @@ def _handle_confirm(token_str: str) -> tuple[str, str]:
     return _token_error_page("Unknown action."), "text/html"
 
 
+def _handle_settings_get(token_str: str) -> tuple[str, str]:
+    """Validate a change_settings token and render the settings page.
+
+    The token proves identity (embedded in the digest email footer),
+    so the email field is readonly and pre-filled.
+    """
+    if not STUDENT_TOKEN_SECRET:
+        return _token_error_page("Token verification is not configured."), "text/html"
+
+    try:
+        data = validate_confirmation_token(token_str, STUDENT_TOKEN_SECRET)
+    except ValueError as exc:
+        return _token_error_page(str(exc)), "text/html"
+
+    if data.get("action") != "change_settings":
+        return _token_error_page("Invalid token type."), "text/html"
+
+    email = data["email"]
+    registry, _ = _load_registry()
+    record = registry["students"].get(email, {})
+    current_packages = record.get("package_ids", [])
+    current_max = clamp_max_papers(record.get("max_papers_per_week", DEFAULT_MAX_PAPERS))
+
+    return _manage_page(
+        email, "settings", current_packages, current_max,
+        settings_token=token_str,
+    ), "text/html"
+
+
+def _handle_settings_post(
+    token_str: str,
+    package_ids: list[str],
+    max_papers_per_week: int,
+) -> tuple[str, str]:
+    """Apply settings changes directly (no confirmation email needed).
+
+    The token already proves the student clicked from their own inbox.
+    """
+    if not STUDENT_TOKEN_SECRET:
+        return _token_error_page("Token verification is not configured."), "text/html"
+
+    try:
+        data = validate_confirmation_token(token_str, STUDENT_TOKEN_SECRET)
+    except ValueError as exc:
+        return _token_error_page(str(exc)), "text/html"
+
+    if data.get("action") != "change_settings":
+        return _token_error_page("Invalid token type."), "text/html"
+
+    email = data["email"]
+    registry, sha = _load_registry()
+    existing = registry["students"].get(email)
+    if not existing:
+        return _token_error_page("No subscription found for this email."), "text/html"
+
+    record = build_student_record(
+        email=email,
+        package_ids=package_ids,
+        max_papers_per_week=max_papers_per_week,
+        existing=existing,
+    )
+    registry["students"][email] = record
+    _save_registry(registry, sha, f"Settings updated for {email}")
+
+    return _settings_updated_page(public_record(record), token_str), "text/html"
+
+
 def _handle_admin_list(body: dict[str, Any]) -> dict[str, Any]:
     _require_admin_token(str(body.get("admin_token", "")))
     include_inactive = bool(body.get("include_inactive", False))
@@ -378,6 +458,50 @@ def _handle_admin_list(body: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "subscriptions": students, "package_labels": package_labels()}
 
 
+def _handle_mark_welcome_sent(body: dict[str, Any]) -> dict[str, Any]:
+    """Mark a student's welcome email as sent."""
+    _require_admin_token(str(body.get("admin_token", "")))
+    email = normalise_email(body.get("email", ""))
+    registry, sha = _load_registry()
+    record = registry["students"].get(email)
+    if not record:
+        raise FileNotFoundError(f"No subscription found for {email}")
+    record["welcome_sent"] = True
+    record["updated_at"] = now_iso()
+    _save_registry(registry, sha, f"Marked welcome sent for {email}")
+    return {"ok": True}
+
+
+def _handle_admin_stats(body: dict[str, Any]) -> dict[str, Any]:
+    """Return aggregate statistics about student subscriptions."""
+    _require_admin_token(str(body.get("admin_token", "")))
+    registry, _ = _load_registry()
+    total_active = 0
+    total_inactive = 0
+    welcome_pending = 0
+    category_dist: dict[str, int] = {}
+    max_papers_dist: dict[str, int] = {}
+    for record in registry["students"].values():
+        if record.get("active", True):
+            total_active += 1
+            if not record.get("welcome_sent", False):
+                welcome_pending += 1
+            for pkg in record.get("package_ids", []):
+                category_dist[pkg] = category_dist.get(pkg, 0) + 1
+            mp_key = str(record.get("max_papers_per_week", DEFAULT_MAX_PAPERS))
+            max_papers_dist[mp_key] = max_papers_dist.get(mp_key, 0) + 1
+        else:
+            total_inactive += 1
+    return {
+        "ok": True,
+        "total_active": total_active,
+        "total_inactive": total_inactive,
+        "welcome_pending": welcome_pending,
+        "category_distribution": category_dist,
+        "max_papers_distribution": max_papers_dist,
+    }
+
+
 def _dispatch(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     action = str(body.get("action", "")).strip().lower()
     if action == "request_subscribe":
@@ -386,6 +510,10 @@ def _dispatch(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         return 200, _handle_request_unsubscribe(body)
     if action == "admin_list":
         return 200, _handle_admin_list(body)
+    if action == "mark_welcome_sent":
+        return 200, _handle_mark_welcome_sent(body)
+    if action == "admin_stats":
+        return 200, _handle_admin_stats(body)
     return 400, {"ok": False, "error": "unknown action"}
 
 
@@ -404,7 +532,7 @@ def _subscribe_success_page(subscription: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Subscribed — AU student digest</title>
 </head>
-<body style="margin:0;padding:24px;background:{_ASH_WHITE};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
+<body style="margin:0;padding:24px;background:{_CREAM};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
   <div style="max-width:480px;margin:60px auto;text-align:center">
     <div style="width:64px;height:64px;border-radius:50%;background:{_PINE};margin:0 auto 24px;display:flex;align-items:center;justify-content:center">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -414,10 +542,10 @@ def _subscribe_success_page(subscription: dict[str, Any]) -> str:
       Your first digest arrives next Monday at 07:00 UTC.
     </p>
     <div style="padding:16px;background:white;border-radius:8px;border:1px solid #E5E3DE;margin-bottom:24px;text-align:left">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{_WARM_GREY};margin-bottom:8px">YOUR PACKAGES</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{_WARM_GREY};margin-bottom:8px">YOUR CATEGORIES</div>
       <div style="font-size:14px;color:{_CHARCOAL}">{html.escape(package_text)}</div>
     </div>
-    <a href="{html.escape(manage_url)}" style="font-size:14px;color:{_PINE};text-decoration:none">Change settings &rarr;</a>
+    <a href="{html.escape(manage_url)}" style="font-size:14px;color:{_PINE};text-decoration:none">Want to change something? Update your settings. &rarr;</a>
   </div>
 </body>
 </html>"""
@@ -433,9 +561,9 @@ def _unsubscribe_success_page() -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unsubscribed — AU student digest</title>
 </head>
-<body style="margin:0;padding:24px;background:{_ASH_WHITE};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
+<body style="margin:0;padding:24px;background:{_CREAM};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
   <div style="max-width:480px;margin:60px auto;text-align:center">
-    <div style="width:64px;height:64px;border-radius:50%;background:{_ALERT_RED};margin:0 auto 24px;display:flex;align-items:center;justify-content:center">
+    <div style="width:64px;height:64px;border-radius:50%;background:{_TERRACOTTA};margin:0 auto 24px;display:flex;align-items:center;justify-content:center">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </div>
     <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:28px;margin:0 0 12px">You've been unsubscribed</h1>
@@ -443,6 +571,42 @@ def _unsubscribe_success_page() -> str:
       You won't receive any more weekly digests.
     </p>
     <a href="{html.escape(manage_url)}" style="font-size:14px;color:{_PINE};text-decoration:none">Resubscribe &rarr;</a>
+  </div>
+</body>
+</html>"""
+
+
+def _settings_updated_page(subscription: dict[str, Any], settings_token: str) -> str:
+    """Success page after applying settings changes."""
+    package_text = ", ".join(
+        package_labels().get(pid, pid) for pid in subscription.get("package_ids", [])
+    )
+    email = subscription["email"]
+    settings_url = (
+        f"{PUBLIC_STUDENT_MANAGE_URL.rstrip('?')}"
+        f"?{urllib.parse.urlencode({'action': 'settings', 'token': settings_token})}"
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings updated — AU student digest</title>
+</head>
+<body style="margin:0;padding:24px;background:{_CREAM};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
+  <div style="max-width:480px;margin:60px auto;text-align:center">
+    <div style="width:64px;height:64px;border-radius:50%;background:{_PINE};margin:0 auto 24px;display:flex;align-items:center;justify-content:center">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:28px;margin:0 0 12px">Settings updated!</h1>
+    <p style="font-size:15px;color:{_WARM_GREY};line-height:1.6;margin:0 0 24px">
+      Your digest at {html.escape(email)} has been updated. Changes take effect with your next email.
+    </p>
+    <div style="padding:16px;background:white;border-radius:8px;border:1px solid #E5E3DE;margin-bottom:24px;text-align:left">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{_WARM_GREY};margin-bottom:8px">YOUR CATEGORIES</div>
+      <div style="font-size:14px;color:{_CHARCOAL}">{html.escape(package_text)}</div>
+    </div>
+    <a href="{html.escape(settings_url)}" style="font-size:14px;color:{_PINE};text-decoration:none">Update your settings again. &rarr;</a>
   </div>
 </body>
 </html>"""
@@ -458,7 +622,7 @@ def _token_error_page(message: str) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Link expired — AU student digest</title>
 </head>
-<body style="margin:0;padding:24px;background:{_ASH_WHITE};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
+<body style="margin:0;padding:24px;background:{_CREAM};font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:{_CHARCOAL}">
   <div style="max-width:480px;margin:60px auto;text-align:center">
     <div style="font-size:48px;margin-bottom:16px">&#x26A0;&#xFE0F;</div>
     <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:24px;margin:0 0 12px">Something went wrong</h1>
@@ -479,8 +643,11 @@ def _manage_page(
     mode: str,
     package_ids: list[str] | None = None,
     max_papers_per_week: int = DEFAULT_MAX_PAPERS,
+    *,
+    settings_token: str = "",
 ) -> str:
     """Return the passwordless student subscription management page."""
+    is_settings = mode == "settings" and settings_token
     safe_email = html.escape(email)
     initial_packages = json.dumps(list(package_ids or []))
     initial_max_papers = clamp_max_papers(max_papers_per_week)
@@ -504,6 +671,7 @@ def _manage_page(
         --pine: {_PINE};
         --gold: {_GOLD};
         --ash-white: {_ASH_WHITE};
+        --cream: {_CREAM};
         --charcoal: {_CHARCOAL};
         --warm-grey: {_WARM_GREY};
         --border: #D8D6D0;
@@ -512,7 +680,7 @@ def _manage_page(
       body {{
         margin: 0;
         min-height: 100vh;
-        background: var(--ash-white);
+        background: var(--cream);
         color: var(--charcoal);
         font-family: "IBM Plex Sans", Helvetica, Arial, sans-serif;
         padding: 24px;
@@ -657,29 +825,6 @@ def _manage_page(
         margin-top: 12px;
         line-height: 1.4;
       }}
-      .unsub-section {{
-        text-align: center;
-        margin-top: 20px;
-      }}
-      .unsub-link {{
-        background: none;
-        border: 0;
-        padding: 0;
-        color: var(--warm-grey);
-        font-size: 13px;
-        cursor: pointer;
-        text-decoration: underline;
-        text-underline-offset: 2px;
-      }}
-      .unsub-link:hover {{
-        color: {_ALERT_RED};
-      }}
-      .unsub-hint {{
-        font-size: 12px;
-        color: var(--warm-grey);
-        margin-top: 4px;
-        opacity: 0.7;
-      }}
       .status {{
         margin-top: 16px;
         padding: 12px 14px;
@@ -708,14 +853,15 @@ def _manage_page(
       <div class="field" style="margin-bottom:24px">
         <label for="email-input">Email</label>
         <input id="email-input" type="email" value="{safe_email}" placeholder="you@example.com"
+          {"readonly" if is_settings else ""}
           style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:10px 12px;
-          font-family:'IBM Plex Sans',sans-serif;font-size:14px;background:#F8F7F4;outline:none">
+          font-family:'IBM Plex Sans',sans-serif;font-size:14px;background:{"#ECEAE5" if is_settings else "#F8F7F4"};outline:none">
       </div>
 
       <hr class="divider">
 
       <!-- Packages -->
-      <div class="section-label">PICK YOUR PACKAGES</div>
+      <div class="section-label">PICK YOUR CATEGORIES</div>
       <div class="packages">
         {packages_markup}
       </div>
@@ -731,17 +877,14 @@ def _manage_page(
         <input id="max_papers" type="hidden" value="{initial_max_papers}">
       </div>
 
-      <!-- Subscribe button -->
-      <button class="primary" type="button" onclick="saveSubscription()">Subscribe</button>
-      <div class="confirm-note">We'll send a confirmation link to your email.</div>
+      <!-- Action button -->
+      <button class="primary" type="button" onclick="saveSubscription()">{"Update settings" if is_settings else "Subscribe"}</button>
+      <div class="confirm-note">{"Changes take effect with your next digest." if is_settings else "We'll send a confirmation link to your email."}</div>
+      {"" if is_settings else '<div style="font-size:13px;color:#999;text-align:center;margin-top:8px;line-height:1.4">You can change settings or unsubscribe anytime from your digest email.</div>'}
 
       <div id="status" class="status"></div>
-
-      <!-- Unsubscribe -->
-      <div class="unsub-section">
-        <button class="unsub-link" type="button" onclick="handleUnsubscribe()">Unsubscribe</button>
-        <div class="unsub-hint">Fill in your email above first.</div>
-      </div>
+      {f'<div style="font-size:13px;text-align:center;margin-top:16px"><a href="{html.escape(_build_manage_url(email))}&amp;mode=unsubscribe" style="color:{_SOFT_GREY};text-decoration:none">Unsubscribe</a></div>' if is_settings else ""}
+      <input type="hidden" id="settings-token" value="{html.escape(settings_token)}">
     </main>
     <script>
       const initialPackages = {initial_packages};
@@ -781,63 +924,59 @@ def _manage_page(
         return email;
       }}
 
+      const settingsToken = document.getElementById("settings-token").value;
+      const isSettings = settingsToken !== "";
+
       async function saveSubscription() {{
         setStatus("", false);
         try {{
           const email = getEmail();
           const packages = selectedPackages();
           if (packages.length === 0) {{
-            setStatus("Pick at least one package.", true);
+            setStatus("Pick at least one category.", true);
             return;
           }}
-          setStatus("Sending confirmation...", false);
-          const response = await fetch(window.location.pathname, {{
-            method: "POST",
-            headers: {{ "Content-Type": "application/json" }},
-            body: JSON.stringify({{
-              action: "request_subscribe",
-              email: email,
-              package_ids: packages,
-              max_papers_per_week: maxPapers,
-            }}),
-          }});
-          const data = await response.json();
-          if (!response.ok || !data.ok) {{
-            setStatus(data.error || "Request failed", true);
-            return;
-          }}
-          if (data.confirmation_sent) {{
-            setStatus("Check your email for a confirmation link.");
+          if (isSettings) {{
+            setStatus("Saving...", false);
+            const params = new URLSearchParams({{
+              action: "update_settings",
+              token: settingsToken,
+            }});
+            packages.forEach(p => params.append("package_ids", p));
+            params.set("max_papers", String(maxPapers));
+            const response = await fetch(window.location.pathname + "?" + params.toString(), {{
+              method: "POST",
+              headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
+            }});
+            if (response.ok) {{
+              document.open();
+              document.write(await response.text());
+              document.close();
+            }} else {{
+              setStatus("Update failed. Please try again.", true);
+            }}
           }} else {{
-            setStatus("Could not send confirmation: " + (data.confirmation_error || "unknown error"), true);
-          }}
-        }} catch (error) {{
-          setStatus(error.message, true);
-        }}
-      }}
-
-      async function handleUnsubscribe() {{
-        setStatus("", false);
-        try {{
-          const email = getEmail();
-          setStatus("Sending confirmation...", false);
-          const response = await fetch(window.location.pathname, {{
-            method: "POST",
-            headers: {{ "Content-Type": "application/json" }},
-            body: JSON.stringify({{
-              action: "request_unsubscribe",
-              email: email,
-            }}),
-          }});
-          const data = await response.json();
-          if (!response.ok || !data.ok) {{
-            setStatus(data.error || "Request failed", true);
-            return;
-          }}
-          if (data.confirmation_sent) {{
-            setStatus("Check your email to confirm unsubscribe.");
-          }} else {{
-            setStatus("Could not send confirmation: " + (data.confirmation_error || "unknown error"), true);
+            setStatus("Sending confirmation...", false);
+            const response = await fetch(window.location.pathname, {{
+              method: "POST",
+              headers: {{ "Content-Type": "application/json" }},
+              body: JSON.stringify({{
+                action: "request_subscribe",
+                email: email,
+                package_ids: packages,
+                max_papers_per_week: maxPapers,
+              }}),
+            }});
+            const data = await response.json();
+            if (!response.ok || !data.ok) {{
+              setStatus(data.error || "Request failed", true);
+              return;
+            }}
+            if (data.confirmation_sent) {{
+              setStatus("Check your email for a confirmation link.");
+            }} else {{
+              setStatus("Could not send confirmation: " + (data.confirmation_error || "unknown error"), true);
+            }}
           }}
         }} catch (error) {{
           setStatus(error.message, true);
@@ -870,6 +1009,17 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
+        # Token-authenticated settings flow
+        if action == "settings" and token:
+            page, content_type = _handle_settings_get(token)
+            payload = page.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         # Settings page
         email = query.get("email", [""])[0]
         mode = query.get("mode", [""])[0]
@@ -892,6 +1042,26 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self):
+        # Settings update via form POST (token-authenticated)
+        path = getattr(self, "path", "")
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
+        post_action = query.get("action", [""])[0]
+        post_token = query.get("token", [""])[0]
+        if post_action == "update_settings" and post_token:
+            pkg_ids = query.get("package_ids", [])
+            max_p = clamp_max_papers(query.get("max_papers", [DEFAULT_MAX_PAPERS])[0])
+            try:
+                page, content_type = _handle_settings_post(post_token, pkg_ids, max_p)
+                payload = page.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            except Exception:
+                self._respond(400, {"ok": False, "error": "settings update failed"})
+            return
+
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")

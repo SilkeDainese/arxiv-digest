@@ -65,7 +65,7 @@ def normalise_package_ids(package_ids: Any) -> list[str]:
         if key in AVAILABLE_STUDENT_PACKAGES and key not in cleaned:
             cleaned.append(key)
     if not cleaned:
-        raise ValueError("Pick at least one student package.")
+        raise ValueError("Pick at least one student category.")
     return cleaned
 
 
@@ -87,6 +87,7 @@ def public_record(record: dict[str, Any]) -> dict[str, Any]:
         "active": normalized["active"],
         "created_at": record.get("created_at"),
         "updated_at": record.get("updated_at"),
+        "welcome_sent": record.get("welcome_sent", False),
     }
 
 
@@ -118,6 +119,9 @@ def build_student_record(
     timestamp = now_iso()
     created_at = (existing.get("created_at") or timestamp) if existing else timestamp
 
+    # Preserve welcome_sent from existing record; new subscriptions start False
+    welcome_sent = (existing.get("welcome_sent", False) if existing else False)
+
     return {
         "email": clean_email,
         "package_ids": packages,
@@ -125,12 +129,14 @@ def build_student_record(
         "active": True,
         "created_at": created_at,
         "updated_at": timestamp,
+        "welcome_sent": welcome_sent,
     }
 
 
 # ─────── Confirmation token system ───────────────────────────
 
 _TOKEN_DEFAULT_TTL = 3600  # 1 hour
+_SETTINGS_TOKEN_TTL = 7 * 86400  # 7 days — longer for email footer links
 _RATE_LIMIT_SECONDS = 15 * 60  # 15 minutes
 
 

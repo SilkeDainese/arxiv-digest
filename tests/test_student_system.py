@@ -243,7 +243,7 @@ def test_footer_uses_student_manage_links_when_present():
     )
 
     assert "Change settings" in footer
-    assert "Change packages" in footer
+    assert "Change categories" in footer
     assert "Manage subscription" in footer
     assert "Unsubscribe" in footer
 
@@ -475,3 +475,132 @@ def test_student_digest_continues_after_unexpected_per_student_error(monkeypatch
 
     assert exit_code == 1  # one failure means exit code 1
     assert sent == ["ok@example.com"]
+
+
+# ─────── Phase 1 UX redesign: student footer ─────────────────
+
+def test_student_footer_shows_silke_attribution():
+    """Student footer must say 'Made by Silke Dainese', not 'Aarhus University'."""
+    from digest import _render_student_footer
+    config = {
+        "digest_name": "AU Astronomy Student Weekly",
+        "institution": "Aarhus University",
+        "department": "Physics and Astronomy",
+        "tagline": "",
+        "github_repo": "",
+        "subscription_manage_url": "https://example.com/manage?email=s@e.com",
+        "subscription_unsubscribe_url": "https://example.com/manage?email=s@e.com&mode=unsubscribe",
+    }
+    footer = _render_student_footer(config, "gemini")
+    assert "Made by" in footer and "Silke Dainese" in footer, "Student footer must credit Silke"
+    # "Aarhus University" may appear in the disclaimer ("not affiliated with") but
+    # must NOT appear as institutional branding (the location/header line).
+    import re
+    # Strip the disclaimer sentence to check that AU doesn't appear elsewhere
+    without_disclaimer = re.sub(r"not affiliated with Aarhus University", "", footer)
+    assert "Aarhus University" not in without_disclaimer, (
+        "Student footer must not use Aarhus University as institutional branding"
+    )
+
+
+# ─────── Phase 2 UX redesign: email card visual overhaul ──────
+
+def test_student_card_has_no_keyword_pills():
+    """Student paper card must not render keyword pills (border-radius spans for matched_keywords)."""
+    from digest import _render_student_paper_card
+
+    paper = make_paper(
+        matched_keywords=["exoplanet", "transit", "habitable"],
+        student_package_ids=["exoplanets"],
+    )
+    html = _render_student_paper_card(paper)
+    # Old design had keyword spans with border-radius:3px pills
+    for kw in ["exoplanet", "transit", "habitable"]:
+        # The keyword text must not appear inside a styled pill/tag span
+        assert f">{kw}</span>" not in html, (
+            f"Keyword '{kw}' should not appear as a pill/tag in the student card"
+        )
+
+
+def test_student_card_has_category_label():
+    """Student paper card must show category as a text label, not a green pill badge."""
+    from digest import _render_student_paper_card
+
+    paper = make_paper(
+        category="astro-ph.SR",
+        student_package_ids=["stars"],
+    )
+    html = _render_student_paper_card(paper)
+    assert "Stars" in html, "Card must show friendly category name 'Stars'"
+    assert "astro-ph.SR" in html, "Card must show arXiv category code"
+    # Must NOT be a green pill badge (old design used PINE background)
+    assert "border-radius:4px" not in html, "Category must not be a pill badge"
+
+
+def test_student_header_uses_warm_white():
+    """Student header text must use WARM_WHITE (#FFFDF8), not plain white."""
+    from digest import _render_student_header
+
+    html = _render_student_header([make_paper()], "2026-03-22")
+    assert "#FFFDF8" in html, "Student header must use WARM_WHITE (#FFFDF8)"
+
+
+# ─────── detect_delights tests ──────────────────────────────
+
+
+def test_detect_delights_au_affiliation():
+    """Paper with AU-affiliated PhD student author gets AU delight."""
+    from digest import detect_delights
+
+    paper = make_paper(
+        is_au_researcher=True,
+        au_researcher_authors=["Jane Doe"],
+        author_affiliations={"Jane Doe": ["PhD student, Aarhus University"]},
+        abstract="We study exoplanets.",
+    )
+    detect_delights([paper])
+    assert any("AU" in d for d in paper["delights"]), "AU affiliation delight expected"
+    assert any("PhD" in d for d in paper["delights"]), "PhD role should appear in delight"
+
+
+def test_detect_delights_telescope():
+    """Paper mentioning JWST in abstract gets telescope delight."""
+    from digest import detect_delights
+
+    paper = make_paper(
+        abstract="We present new JWST observations of exoplanet atmospheres.",
+    )
+    detect_delights([paper])
+    assert "JWST data" in paper["delights"]
+
+
+def test_detect_delights_max_two():
+    """Papers matching many keywords still get at most 2 delights."""
+    from digest import detect_delights
+
+    paper = make_paper(
+        abstract="Using JWST, TESS, Kepler, Chandra, and ALMA data we study stars.",
+    )
+    detect_delights([paper])
+    assert len(paper["delights"]) <= 2
+
+
+def test_detect_delights_no_duplicates():
+    """Synonyms like JWST and James Webb produce only one delight."""
+    from digest import detect_delights
+
+    paper = make_paper(
+        abstract="The James Webb Space Telescope (JWST) observed the target.",
+    )
+    detect_delights([paper])
+    jwst_count = sum(1 for d in paper["delights"] if d == "JWST data")
+    assert jwst_count == 1
+
+
+def test_detect_delights_empty_when_no_match():
+    """Paper with no keyword matches and no AU affiliation gets empty delights."""
+    from digest import detect_delights
+
+    paper = make_paper(abstract="A study of fluid dynamics in pipes.")
+    detect_delights([paper])
+    assert paper["delights"] == []

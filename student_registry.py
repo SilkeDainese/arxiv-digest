@@ -43,7 +43,7 @@ def normalise_package_ids(package_ids: Any) -> list[str]:
         if key in AVAILABLE_STUDENT_PACKAGES and key not in cleaned:
             cleaned.append(key)
     if not cleaned:
-        raise ValueError("Pick at least one student package.")
+        raise ValueError("Pick at least one student category.")
     return cleaned
 
 

@@ -83,7 +83,7 @@ def select_packages() -> list[str]:
                 selected.append(track_id)
         if selected:
             return selected
-        print("Pick at least one package.")
+        print("Pick at least one category.")
 
 
 def post_json(url: str, payload: dict) -> dict:
