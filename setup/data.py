@@ -221,6 +221,35 @@ AU_STUDENT_KEYWORD_ALIASES = {
     "catalog": ["catalogue"],
 }
 
+# ─────── Delight Keywords (cultural wayfinding) ─────────────
+
+DELIGHT_KEYWORDS = {
+    # Telescopes & instruments
+    "JWST": "JWST data",
+    "James Webb": "JWST data",
+    "VLT": "ESO's VLT, Chile",
+    "Very Large Telescope": "ESO's VLT, Chile",
+    "ALMA": "ALMA, Chile",
+    "Nordic Optical Telescope": "Nordic Optical Telescope, La Palma",
+    "NOT telescope": "Nordic Optical Telescope, La Palma",
+    "SONG": "SONG telescope",
+    "SONG telescope": "SONG telescope",
+    # Space missions
+    "Gaia DR": "Gaia data",
+    "Gaia Data Release": "Gaia data",
+    "TESS": "TESS data",
+    "Kepler": "Kepler data",
+    "Hubble": "Hubble data",
+    "HST": "Hubble data",
+    "Chandra": "Chandra data",
+    "XMM-Newton": "XMM-Newton data",
+    # Danish/AU specific
+    "Delphini-1": "AU student satellite",
+    "AUSAT": "AU student satellite",
+    "Ole Romer": "Ole Rømer Observatory",
+    "Ole Rømer": "Ole Rømer Observatory",
+}
+
 # ─────────────────────────────────────────────────────────────
 #  arXiv categories + AI suggestion hints
 # ─────────────────────────────────────────────────────────────
