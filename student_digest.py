@@ -109,11 +109,12 @@ What they do NOT know (avoid or explain): specialized subfields (superradiance, 
 
 Rules:
 - One sentence each, max 25 words
-- Use concepts they know from their courses when possible
-- If the paper topic is outside their knowledge, describe the result in plain language
-- Say what they FOUND or DID, not what method they used
-- No LaTeX, no symbols like $M_\\odot$ — write "Sun-like mass" or "solar mass" instead
-- Keep it factual, not dumbed down — just legible
+- Say what they FOUND, not how they did it — skip methods, pipelines, calibration
+- No jargon, no acronyms, no parenthetical definitions like "point-spread-function (PSF)"
+- If a term needs explaining, you used the wrong term — pick a simpler one
+- No LaTeX, no symbols like $M_\\odot$ — write "solar mass" instead
+- No hedging ("struggles to", "carefully calibrated") — just state the result
+- Write like a smart friend explaining over coffee, not like an abstract
 
 Papers:
 {json.dumps(titles_and_summaries, indent=2)}

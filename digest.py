@@ -1364,9 +1364,9 @@ def _one_sentence(text: str) -> str:
     if not clean:
         return ""
     # Strip LaTeX math that leaks from abstracts/AI summaries
-    clean = re.sub(r"\$[^$]+\$", "", clean)  # remove $...$ inline math
-    clean = re.sub(r"\\[a-zA-Z]+\{[^}]*\}", "", clean)  # remove \cmd{...}
-    clean = " ".join(clean.split()).strip()  # collapse whitespace
+    clean = _strip_latex(clean)
+    clean = re.sub(r"\s*,\s*,", ",", clean)  # collapse ",, " from removed LaTeX
+    clean = re.sub(r"of\s*,", "of", clean)  # clean up dangling prepositions
     if not clean:
         return ""
     m = re.match(r"^(.+?[.!?])\s", clean)
@@ -1376,9 +1376,21 @@ def _one_sentence(text: str) -> str:
     return sentence
 
 
+def _strip_latex(text: str) -> str:
+    """Remove inline LaTeX from text (titles, summaries)."""
+    text = re.sub(r"\$([^$]+)\$", r"\1", text)  # $x$ → x (unwrap math mode)
+    text = re.sub(r"\\times", "x", text)  # \times → x
+    text = re.sub(r"\\odot", "☉", text)  # \odot → ☉ (solar symbol)
+    text = re.sub(r"\\[a-zA-Z]+\{([^}]*)\}", r"\1", text)  # \cmd{x} → x
+    text = re.sub(r"\\[a-zA-Z]+", "", text)  # bare \cmd → remove
+    text = re.sub(r"[_^]\{([^}]*)\}", r"\1", text)  # _{sub} → sub, ^{sup} → sup
+    text = re.sub(r"[_^](\S)", r"\1", text)  # _4 → 4, ^2 → 2
+    return " ".join(text.split()).strip()
+
+
 def _short_title(title: str, max_len: int = 105) -> str:
     """Return a shortened title for denser email cards."""
-    t = " ".join((title or "").split())
+    t = _strip_latex(" ".join((title or "").split()))
     if len(t) <= max_len:
         return t
     # Cut at word boundary to avoid mid-word truncation
