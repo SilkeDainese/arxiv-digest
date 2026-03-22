@@ -71,6 +71,67 @@ def _generate_settings_token(email: str, secret: str) -> str:
     return f"{data_b64}.{sig_b64}"
 
 
+def rewrite_summaries_for_students(
+    papers: list[dict[str, Any]],
+    api_key: str,
+) -> None:
+    """Rewrite plain_summary fields to be accessible to undergrad students.
+
+    Uses a single batch API call to rewrite all summaries at once.
+    Falls back gracefully — if anything fails, original summaries stay.
+    """
+    if not api_key or not papers:
+        return
+
+    titles_and_summaries = []
+    for p in papers:
+        titles_and_summaries.append({
+            "title": p.get("title", ""),
+            "summary": p.get("plain_summary", ""),
+        })
+
+    prompt = f"""Rewrite these astronomy paper summaries for 2nd-year university students.
+
+Rules:
+- One sentence each, max 25 words
+- No jargon they wouldn't know (no "superradiance", "ultralight axions", "metallicity", "spectroscopy" without context)
+- Say what they FOUND or DID, not what method they used
+- If unsure what something means to a student, describe the result plainly
+- No LaTeX, no symbols like $M_\\odot$
+- Keep it factual, not dumbed down — just legible
+
+Papers:
+{json.dumps(titles_and_summaries, indent=2)}
+
+Respond with ONLY a JSON array of objects, one per paper, in order:
+[{{"summary": "..."}}, {{"summary": "..."}}]"""
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip()
+        rewrites = json.loads(text)
+
+        if len(rewrites) != len(papers):
+            print(f"  ⚠️  Summary rewrite returned {len(rewrites)} items for {len(papers)} papers — skipping")
+            return
+
+        for paper, rewrite in zip(papers, rewrites):
+            new_summary = rewrite.get("summary", "").strip()
+            if new_summary:
+                paper["plain_summary"] = new_summary
+
+        print(f"  ✅ Rewrote {len(papers)} summaries for students")
+
+    except Exception as e:
+        print(f"  ⚠️  Student summary rewrite failed ({e}) — using originals")
+
+
 def build_student_base_config() -> dict[str, Any]:
     """Return the shared AU-student digest configuration."""
     config = build_au_student_config(
@@ -396,6 +457,13 @@ def main(argv: list[str] | None = None) -> int:
     detect_au_researchers(ranked_papers)
     detect_delights(ranked_papers)
     apply_aggregate_expert_signal(ranked_papers, aggregated)
+
+    # Rewrite summaries for student readability (uses Haiku — cheap + fast)
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if anthropic_key:
+        print("\n📝 Rewriting summaries for students...")
+        rewrite_summaries_for_students(ranked_papers, anthropic_key)
+
     print(f"   {len(ranked_papers)} papers available for student selection ({scoring_method})")
 
     # ─────── Send-preview: one email to RECIPIENT_EMAIL ──────

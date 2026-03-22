@@ -266,3 +266,65 @@ class TestWelcomeHeader:
         }
         html = render_html([paper], [], config, "January 01, 2025", own_papers=[], scoring_method="keyword")
         assert "Welcome to the AU student digest" not in html
+
+
+# ─────────────────────────────────────────────────────────────
+#  rewrite_summaries_for_students()
+# ─────────────────────────────────────────────────────────────
+
+
+class TestStudentSummaryRewrite:
+    """Student summaries should be rewritten to avoid jargon."""
+
+    def _make_papers(self):
+        return [
+            {
+                "title": "Black hole superradiance from ultralight axions",
+                "plain_summary": "Black hole superradiance is a powerful probe of ultralight axions.",
+                "abstract": "We constrain ultralight axion masses using superradiant instabilities.",
+            },
+            {
+                "title": "TOI-1232 b: A warm Neptune",
+                "plain_summary": "TOI-1232 is a G-dwarf with $1.06 M_\\odot$.",
+                "abstract": "We report two planets transiting TOI-1232.",
+            },
+        ]
+
+    def test_rewrite_replaces_plain_summary(self):
+        """Successful rewrite replaces plain_summary with student-friendly version."""
+        mock_anthropic = MagicMock()
+        mock_client = MagicMock()
+        mock_anthropic.Anthropic.return_value = mock_client
+        mock_client.messages.create.return_value = MagicMock(
+            content=[MagicMock(text='[{"summary": "Spinning black holes can reveal invisible particles."}, {"summary": "Two warm planets found orbiting a Sun-like star."}]')]
+        )
+
+        papers = self._make_papers()
+        with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+            sd.rewrite_summaries_for_students(papers, "fake-key")
+
+        assert papers[0]["plain_summary"] == "Spinning black holes can reveal invisible particles."
+        assert papers[1]["plain_summary"] == "Two warm planets found orbiting a Sun-like star."
+
+    def test_rewrite_keeps_original_on_failure(self):
+        """If the API call fails, original summaries are preserved."""
+        mock_anthropic = MagicMock()
+        mock_client = MagicMock()
+        mock_anthropic.Anthropic.return_value = mock_client
+        mock_client.messages.create.side_effect = Exception("API error")
+
+        papers = self._make_papers()
+        original_0 = papers[0]["plain_summary"]
+        original_1 = papers[1]["plain_summary"]
+        with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+            sd.rewrite_summaries_for_students(papers, "fake-key")
+
+        assert papers[0]["plain_summary"] == original_0
+        assert papers[1]["plain_summary"] == original_1
+
+    def test_rewrite_skipped_without_api_key(self):
+        """No API key means no rewrite — originals preserved."""
+        papers = self._make_papers()
+        original = papers[0]["plain_summary"]
+        sd.rewrite_summaries_for_students(papers, "")
+        assert papers[0]["plain_summary"] == original
