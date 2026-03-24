@@ -85,8 +85,20 @@ keywords:
 
   # Instruments & surveys
   Keck spectroscopy: 6
+  KPF: 8
+  Keck Planet Finder: 8
   LAMOST: 5
   macroturbulence: 6
+
+  # Obliquity surveys & methods
+  BANANA: 8
+  von Mises-Fisher: 7
+  vMF distribution: 7
+  astrometric binary: 7
+  astrometric orbit: 7
+  orbital inclination: 8
+  spin-orbit misalignment: 9
+  inclination distribution: 7
 
   # Rotation-adjacent
   rotation period: 7
