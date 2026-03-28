@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write   # required for Workload Identity Federation
 
 jobs:
   send-digest:
@@ -17,11 +18,17 @@ jobs:
         if: github.event_name == 'schedule'
         run: |
           DELAY=$((RANDOM % 900))
-          echo "⏳ Waiting ${DELAY}s to spread Gemini API load across forks..."
+          echo "Waiting ${DELAY}s to spread API load across forks..."
           sleep $DELAY
 
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@71f986410dfbc7b588cf3c845dab37ef1e5c1a5  # v2.1.7
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
@@ -34,34 +41,33 @@ jobs:
       - name: Check config
         run: |
           if [ ! -f config.yaml ]; then
-            echo "❌ config.yaml is missing. Upload your generated config.yaml to the repo before running the digest."
+            echo "config.yaml is missing. Upload your generated config.yaml to the repo before running the digest."
             exit 1
           fi
           CONFIG_RECIPIENT=$(python -c "import yaml; c=yaml.safe_load(open('config.yaml')); print((c.get('recipient_email') or '').strip())" 2>/dev/null || echo "")
           if [ -z "$RECIPIENT_EMAIL" ] && [ -z "$CONFIG_RECIPIENT" ]; then
-            echo "❌ No recipient email found. Set recipient_email in config.yaml (the setup wizard does this for you)."
+            echo "No recipient email found. Set recipient_email in config.yaml (the setup wizard does this for you)."
             exit 1
           fi
-          echo "✅ recipient_email configured"
+          echo "recipient_email configured"
           # Delivery requires either direct SMTP credentials or an explicit relay token.
           SMTP_U="${SMTP_USER:-$GMAIL_USER}"
           SMTP_P="${SMTP_PASSWORD:-$GMAIL_APP_PASSWORD}"
           if [ -n "$SMTP_U" ] && [ -n "$SMTP_P" ]; then
-            echo "✅ SMTP credentials found — sending directly"
+            echo "SMTP credentials found — sending directly"
           elif [ -n "$DIGEST_RELAY_TOKEN" ]; then
-            echo "✅ Relay token found — sending through shared relay"
+            echo "Relay token found — sending through shared relay"
           else
-            echo "❌ No email delivery method configured."
+            echo "No email delivery method configured."
             echo "   Add DIGEST_RELAY_TOKEN for relay delivery, or SMTP_USER and SMTP_PASSWORD to send directly."
             exit 1
           fi
-          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "✅ Claude API key found"; fi
-          if [ -n "$GEMINI_API_KEY" ]; then echo "✅ Gemini API key found"; fi
-          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then echo "ℹ️  No AI key configured — using keyword fallback"; fi
+          # ANTHROPIC_API_KEY is optional — used as fallback AI provider if present
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "Claude API key found (optional fallback)"; fi
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "No AI key configured — using keyword fallback (this is fine)"; fi
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # optional fallback
           DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
@@ -70,15 +76,15 @@ jobs:
 
       - name: Run digest
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # optional fallback
           DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GCP_PROJECT: silke-hub
         run: python digest.py
 
       - name: Commit keyword stats
@@ -90,8 +96,8 @@ jobs:
           git pull --rebase || true
           [ -f keyword_stats.json ] && git add keyword_stats.json || true
           [ -f feedback_stats.json ] && git add feedback_stats.json || true
-          git diff --cached --quiet || git commit -m "📊 Update digest stats [skip ci]"
-          git push || echo "⚠️ Could not push stats (workflow permissions may not be enabled). This is optional — your digest still works fine."
+          git diff --cached --quiet || git commit -m "Update digest stats [skip ci]"
+          git push || echo "Could not push stats (workflow permissions may not be enabled). This is optional — your digest still works fine."
 
       - name: Upload digest as artifact
         if: always()
@@ -116,7 +122,7 @@ jobs:
           else:
               print('?')
           " 2>/dev/null || echo "?")
-          echo "### 🔭 Digest Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### Digest Run Summary" >> $GITHUB_STEP_SUMMARY
           echo "- Papers with keyword hits: $PAPER_COUNT" >> $GITHUB_STEP_SUMMARY
           echo "- Workflow: digest" >> $GITHUB_STEP_SUMMARY
           echo "- Triggered by: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY

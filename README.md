@@ -100,7 +100,7 @@ If AI is unavailable, the system cascades automatically through fallback tiers:
 | Tier | Provider | When it's used |
 |------|----------|----------------|
 | 1 | Claude (Anthropic) | If you add `ANTHROPIC_API_KEY` |
-| 2 | Gemini (Google) | If you add `GEMINI_API_KEY` |
+| 2 | Gemini 2.0 Flash (Vertex AI / GCP) | If `google-genai` is installed and ADC is configured |
 | 3 | Keywords only | Always — no key needed |
 
 If one tier fails, the next takes over. You always get a digest. The AI keys are entirely optional — keyword scoring works well on its own, especially once you tune your keyword weights.
@@ -198,6 +198,31 @@ python setup/server.py            # run the setup wizard locally at localhost:80
 Run `python -m scripts.friend_setup` from a checkout of this repo. It opens the setup wizard, waits for the downloaded config file, forks the repo, uploads the config, and enables GitHub Actions — all in one go.
 
 </details>
+
+---
+
+## GCP Vertex AI Setup (maintainer only)
+
+This section is for the repo owner running the digest with Vertex AI on GCP. Forkers using their own AI keys don't need this.
+
+**One-time setup:**
+
+1. Run the setup script from your local machine (requires `gcloud` CLI, authenticated to `silke-hub`):
+
+   ```bash
+   bash gcp-wif-setup.sh
+   ```
+
+   This creates a service account, a Workload Identity Pool, and a GitHub OIDC provider — no API keys involved.
+
+2. The script prints two values at the end. Add them as **GitHub Actions variables** (Settings → Secrets and variables → Actions → Variables tab — not secrets, they contain no sensitive data):
+
+   | Variable name | Value |
+   |---|---|
+   | `WIF_PROVIDER` | `projects/932510967521/locations/global/workloadIdentityPools/github-pool/providers/github-provider` |
+   | `WIF_SERVICE_ACCOUNT` | `arxiv-digest-runner@silke-hub.iam.gserviceaccount.com` |
+
+3. That's it. GitHub Actions will authenticate to GCP automatically on every run. No API key needed, no rotation required.
 
 ---
 
