@@ -38,6 +38,12 @@ try:
 except ImportError:
     HAS_ANTHROPIC = False
 
+try:
+    from google import genai as google_genai
+    HAS_VERTEX_GEMINI = True
+except ImportError:
+    HAS_VERTEX_GEMINI = False
+
 # ─────────────────────────────────────────────────────────────
 #  CONFIGURATION (loaded from config.yaml)
 # ─────────────────────────────────────────────────────────────
@@ -1111,6 +1117,47 @@ def _analyse_with_claude(papers: list[dict[str, Any]], config: dict[str, Any], a
 
 
 
+def _analyse_with_vertex_gemini(papers: list[dict[str, Any]], config: dict[str, Any]) -> tuple[list[dict[str, Any]] | None, str | None]:
+    """Score papers using Gemini via Vertex AI (ADC auth — no API key needed).
+    Returns (results, error_flag). error_flag is None on success, or a string describing the issue."""
+    gcp_project = os.environ.get("GCP_PROJECT", "silke-hub")
+    client = google_genai.Client(vertexai=True, project=gcp_project, location="europe-west1")
+    analysed = []
+    consecutive_failures = 0
+
+    for i, paper in enumerate(papers):
+        print(f"  Analysing {i+1}/{len(papers)}: {paper['title'][:60]}...")
+        prompt = _build_scoring_prompt(paper, config)
+
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt,
+            )
+            text = response.text.strip()
+            # Strip markdown fences if the model wraps with ```json ... ```
+            if text.startswith("```"):
+                text = re.sub(r"^```[a-z]*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
+            analysis = json.loads(text)
+            paper.update(analysis)
+            analysed.append(paper)
+            consecutive_failures = 0
+            print(f"    → score: {analysis.get('relevance_score', '?')}")
+        except Exception as e:
+            error_str = str(e)
+            print(f"    Error: {error_str}")
+            consecutive_failures += 1
+            paper.update(_default_analysis(paper))
+            analysed.append(paper)
+
+            if consecutive_failures >= 3:
+                print("  ⚠️  3 consecutive Vertex AI Gemini failures — switching to fallback...")
+                return None, "gemini_errors"
+
+    return _filter_and_sort(analysed, config), None
+
+
 def _fallback_analyse(papers: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
     """Keyword-only scoring when no API key is available."""
     discovery_mode = not config["keywords"]
@@ -1155,9 +1202,9 @@ def _filter_and_sort(analysed: list[dict[str, Any]], config: dict[str, Any]) -> 
 
 
 def analyse_papers(papers: list[dict[str, Any]], config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-    """Dispatch to Claude for scoring, falling back to keyword-only on failure.
+    """Dispatch to Claude → Vertex AI Gemini → keyword fallback.
     Returns (scored_papers, scoring_method) where scoring_method is one of:
-    'claude', 'keywords', or 'keywords_fallback'."""
+    'claude', 'vertex_gemini', 'keywords', or 'keywords_fallback'."""
     if not papers:
         return [], "none"
 
@@ -1168,11 +1215,18 @@ def analyse_papers(papers: list[dict[str, Any]], config: dict[str, Any]) -> tupl
         result, error = _analyse_with_claude(papers, config, api_key_claude)
         if error is None:
             return result, "claude"
-        print("  Claude unavailable — falling back to keyword-only scoring")
+        print("  Claude unavailable — falling back to Vertex AI Gemini...")
+
+    if HAS_VERTEX_GEMINI:
+        print("  Using Vertex AI Gemini for analysis...")
+        result, error = _analyse_with_vertex_gemini(papers, config)
+        if error is None:
+            return result, "vertex_gemini"
+        print("  Vertex AI Gemini unavailable — falling back to keyword-only scoring")
         return _fallback_analyse(papers, config), "keywords_fallback"
 
-    # No Claude key — keyword-only scoring
-    print("  ⚠️  No ANTHROPIC_API_KEY set — using keyword-only scoring")
+    # No AI available — keyword-only scoring
+    print("  ⚠️  No AI available — using keyword-only scoring")
     return _fallback_analyse(papers, config), "keywords"
 
 
@@ -1643,7 +1697,14 @@ def _render_skim_card(p: dict[str, Any], github_repo: str) -> str:
 
 def _render_scoring_notice(scoring_method: str) -> str:
     """Return the scoring-method notice banner HTML (or empty string)."""
-    if scoring_method == "keywords_fallback":
+    if scoring_method == "vertex_gemini":
+        return f"""
+  <tr><td style="padding:12px 44px">
+    <div style="background:{PINE_WASH};border:1px solid {CARD_BORDER};border-radius:6px;padding:14px 18px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{WARM_GREY};text-align:center">
+      &#x1F916; Papers scored by <strong>Gemini 2.0 Flash (Vertex AI / GCP)</strong>. High-quality AI scoring via Google Cloud.
+    </div>
+  </td></tr>"""
+    elif scoring_method == "keywords_fallback":
         return f"""
   <tr><td style="padding:12px 44px">
     <div style="background:{GOLD_WASH};border:1px solid {GOLD_LIGHT};border-radius:6px;padding:14px 18px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};text-align:center">
@@ -1708,7 +1769,7 @@ def _render_own_key_nudge(config: dict[str, Any], scoring_method: str) -> str:
     """Gentle nudge to get your own API key if using the shared community key."""
     if config.get("own_api_key"):
         return ""
-    if scoring_method not in {"claude", "keywords_fallback"}:
+    if scoring_method not in {"claude", "vertex_gemini", "keywords_fallback"}:
         return ""
     github_repo = config.get("github_repo", "")
     secrets_url = f"https://github.com/{github_repo}/settings/secrets/actions" if github_repo else ""
@@ -1756,6 +1817,7 @@ def _render_student_footer(config: dict[str, Any], scoring_method: str) -> str:
 
     scoring_labels = {
         "claude": "Claude Haiku (Anthropic)",
+        "vertex_gemini": "Gemini 2.0 Flash (Vertex AI / GCP)",
         "keywords": "keyword matching",
         "keywords_fallback": "keyword matching (AI unavailable)",
         "none": "AI",
@@ -1826,6 +1888,7 @@ def _render_footer(config: dict[str, Any], scoring_method: str) -> str:
     # ── Scoring label ──
     scoring_labels = {
         "claude": "Claude Haiku (Anthropic)",
+        "vertex_gemini": "Gemini 2.0 Flash (Vertex AI / GCP)",
         "keywords": "keyword matching",
         "keywords_fallback": "keyword matching (AI unavailable)",
         "none": "AI",

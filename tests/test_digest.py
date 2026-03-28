@@ -1151,11 +1151,12 @@ class TestAnalysePapersCascade:
         p = make_paper(keyword_hits=50.0)
         env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
         with patch.dict(os.environ, env, clear=True):
-            result, method = d.analyse_papers([p], config)
+            with patch.object(d, "HAS_VERTEX_GEMINI", False):
+                result, method = d.analyse_papers([p], config)
         assert method == "keywords"
 
-    def test_claude_credit_error_cascades_to_keywords_fallback(self, tmp_stats_path):
-        """When Claude returns a credit error, should cascade to keyword fallback."""
+    def test_claude_credit_error_with_no_vertex_uses_keywords(self, tmp_stats_path):
+        """When Claude returns a credit error and no Vertex AI is available, cascades to plain keywords."""
         config = make_config(min_score=1, max_papers=10)
         p = make_paper(keyword_hits=50.0)
 
@@ -1165,11 +1166,13 @@ class TestAnalysePapersCascade:
         env = {"ANTHROPIC_API_KEY": "fake-key"}
         with patch.dict(os.environ, env):
             with patch.object(d, "HAS_ANTHROPIC", True):
-                with patch.object(d, "_analyse_with_claude", fake_claude):
-                    result, method = d.analyse_papers([p], config)
-        assert method == "keywords_fallback"
+                with patch.object(d, "HAS_VERTEX_GEMINI", False):
+                    with patch.object(d, "_analyse_with_claude", fake_claude):
+                        result, method = d.analyse_papers([p], config)
+        assert method == "keywords"
 
-    def test_claude_error_uses_keywords_fallback(self):
+    def test_claude_error_with_no_vertex_uses_keywords(self):
+        """When Claude errors and no Vertex AI is available, cascades to plain keywords."""
         config = make_config(min_score=1, max_papers=10)
         p = make_paper(keyword_hits=50.0)
 
@@ -1178,7 +1181,49 @@ class TestAnalysePapersCascade:
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "fake-key"}, clear=True):
             with patch.object(d, "HAS_ANTHROPIC", True):
-                with patch.object(d, "_analyse_with_claude", fake_claude):
+                with patch.object(d, "HAS_VERTEX_GEMINI", False):
+                    with patch.object(d, "_analyse_with_claude", fake_claude):
+                        result, method = d.analyse_papers([p], config)
+        assert method == "keywords"
+
+    def test_vertex_gemini_used_when_no_claude_key(self):
+        """With no Claude key and Vertex AI available, should use vertex_gemini."""
+        config = make_config(min_score=1, max_papers=10)
+        p = make_paper(keyword_hits=50.0)
+
+        def fake_vertex(papers, cfg):
+            for paper in papers:
+                paper.update({
+                    "relevance_score": 7,
+                    "plain_summary": "Summary.",
+                    "why_interesting": "Relevant.",
+                    "emoji": "🌟",
+                    "highlight_phrase": "Test result",
+                    "kw_tags": [],
+                    "method_tags": [],
+                    "is_new_catalog": False,
+                    "cite_worthy": False,
+                    "new_result": None,
+                })
+            return papers, None
+
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(d, "HAS_VERTEX_GEMINI", True):
+                with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
+                    result, method = d.analyse_papers([p], config)
+        assert method == "vertex_gemini"
+
+    def test_vertex_gemini_error_falls_back_to_keywords(self):
+        """When Vertex AI Gemini fails, should cascade to keyword fallback."""
+        config = make_config(min_score=1, max_papers=10)
+        p = make_paper(keyword_hits=50.0)
+
+        def fake_vertex(papers, cfg):
+            return None, "gemini_errors"
+
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(d, "HAS_VERTEX_GEMINI", True):
+                with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
                     result, method = d.analyse_papers([p], config)
         assert method == "keywords_fallback"
 

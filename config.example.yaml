@@ -111,6 +111,7 @@ smtp_port: 587
 # own_api_key: true   # set to true once you add your own ANTHROPIC_API_KEY
 # AI scoring is enabled by adding ANTHROPIC_API_KEY as a repo secret.
 # Claude Haiku scores ~80 papers per digest for roughly $0.01 per run.
+# GCP_PROJECT: silke-hub  # Vertex AI project — set in GitHub Actions vars (no cost with GCP credits)
 
 # ── Your Repository ───────────────────────────
 # Used for self-service links in emails (edit config, pause digest).
