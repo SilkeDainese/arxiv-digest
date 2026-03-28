@@ -192,6 +192,46 @@ AU_ASTRONOMY_PEOPLE = [
         ],
         "note": "Associate professor; SONG telescope, astronomical instrumentation, and student space projects.",
     },
+    {
+        "name": "Silke Dainese",
+        "match": ["Dainese, S", "Silke Dainese", "Silke S Dainese", "S Dainese"],
+        "note": "PhD researcher; stellar rotation, Kraft break, spin-orbit alignment, Gaia DR3/DR4.",
+    },
+    {
+        "name": "Liv Hornekær",
+        "match": ["Hornekær, L", "Liv Hornekær", "Liv Hornekaer", "L Hornekær"],
+        "note": "Professor; surface physics, astrochemistry, interstellar ice, hydrogen on graphene.",
+    },
+    {
+        "name": "Marcus Marcussen",
+        "match": ["Marcussen, M", "Marcus Marcussen"],
+        "note": "AU astronomy researcher.",
+    },
+    {
+        "name": "Jens Reersted Larsen",
+        "match": ["Larsen, J R", "Jens Larsen", "Jens R Larsen", "Jens Reersted Larsen"],
+        "note": "AU astronomy researcher.",
+    },
+    {
+        "name": "Kamil Kalinowski",
+        "match": ["Kalinowski, K", "Kamil Kalinowski", "Kamil K Kalinowski", "Kamil Krzysztof Kalinowski"],
+        "note": "AU astronomy researcher.",
+    },
+    {
+        "name": "Samuel Grund Sørensen",
+        "match": ["Sørensen, S", "Sorensen, S", "Samuel Sørensen", "Samuel Sorensen", "Samuel G Sørensen", "Samuel Grund Sørensen"],
+        "note": "AU astronomy researcher.",
+    },
+    {
+        "name": "Emil Knudstrup",
+        "match": ["Knudstrup, E", "Emil Knudstrup"],
+        "note": "AU astronomy researcher.",
+    },
+    {
+        "name": "Mark Lykke Winther",
+        "match": ["Winther, M", "Mark Winther", "Mark L Winther", "Mark Lykke Winther"],
+        "note": "AU astronomy researcher.",
+    },
 ]
 
 AU_STUDENT_TELESCOPE_KEYWORDS = {
