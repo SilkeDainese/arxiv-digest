@@ -1,6 +1,6 @@
 """
 arXiv Digest — Personalised paper curation engine.
-Fetches new arXiv papers, scores them with AI (Claude → Gemini → keyword fallback),
+Fetches new arXiv papers, scores them with AI (Claude → keyword fallback),
 and sends a beautiful HTML digest via email.
 
 Configuration lives in config.yaml — edit that file to update keywords, colleagues, etc.
@@ -37,12 +37,6 @@ try:
     HAS_ANTHROPIC = True
 except ImportError:
     HAS_ANTHROPIC = False
-
-try:
-    from google import genai
-    HAS_GEMINI = True
-except ImportError:
-    HAS_GEMINI = False
 
 # ─────────────────────────────────────────────────────────────
 #  CONFIGURATION (loaded from config.yaml)
@@ -993,11 +987,11 @@ def extract_own_papers(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 # ─────────────────────────────────────────────────────────────
-#  AI ANALYSIS — Claude → Gemini → Keyword Fallback
+#  AI ANALYSIS — Claude → Keyword Fallback
 # ─────────────────────────────────────────────────────────────
 
 def _build_scoring_prompt(paper: dict[str, Any], config: dict[str, Any]) -> str:
-    """Shared prompt builder used by both Claude and Gemini paths."""
+    """Build the scoring prompt for Claude."""
     # Sanitize researcher_name to prevent f-string/JSON corruption
     researcher_name = config["researcher_name"].replace('"', "'").replace("{", "").replace("}", "")
     research_context = config.get("research_context", "").strip()
@@ -1084,7 +1078,7 @@ def _analyse_with_claude(papers: list[dict[str, Any]], config: dict[str, Any], a
 
         try:
             response = client.messages.create(
-                model=config.get("claude_model", "claude-sonnet-4-20250514"),
+                model=config.get("claude_model", "claude-haiku-4-5-20251001"),
                 max_tokens=600,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -1115,97 +1109,6 @@ def _analyse_with_claude(papers: list[dict[str, Any]], config: dict[str, Any], a
 
     return _filter_and_sort(analysed, config), None
 
-
-def _analyse_with_gemini(papers: list[dict[str, Any]], config: dict[str, Any], api_key: str) -> tuple[list[dict[str, Any]] | None, str | None]:
-    """Score papers using Gemini 2.0 Flash (free tier).
-
-    Returns (results, error_flag). error_flag is None on success, or a short string.
-    """
-    client = genai.Client(api_key=api_key)
-    analysed = []
-    rate_limit_failures = 0
-    consecutive_failures = 0
-
-    for i, paper in enumerate(papers):
-        print(f"  Analysing {i+1}/{len(papers)} (Gemini): {paper['title'][:60]}...")
-        prompt = _build_scoring_prompt(paper, config)
-
-        if i > 0:
-            time.sleep(4)  # free tier = 15 RPM
-
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            text = response.text.strip()
-            # Strip markdown code fences if present
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-                text = text.strip()
-                if text.endswith("```"):
-                    text = text[:-3].strip()
-            analysis = json.loads(text)
-            paper.update(analysis)
-            analysed.append(paper)
-            rate_limit_failures = 0
-            consecutive_failures = 0
-            print(f"    → score: {analysis.get('relevance_score', '?')}")
-        except Exception as e:
-            error_str = str(e)
-            lower = error_str.lower()
-            print(f"    Error: {error_str}")
-            consecutive_failures += 1
-
-            is_rate_limit = (
-                "429" in lower
-                or ("rate" in lower and "limit" in lower)
-                or "quota" in lower
-                or "resource_exhausted" in lower
-                or "resource exhausted" in lower
-            )
-
-            if is_rate_limit:
-                rate_limit_failures += 1
-                backoff = 20 if rate_limit_failures == 1 else 40
-                print(f"    ⏳ Gemini free-tier limit hit — backing off {backoff}s and retrying once...")
-                time.sleep(backoff)
-                try:
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt,
-                    )
-                    text = response.text.strip()
-                    if text.startswith("```"):
-                        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-                        text = text.strip()
-                        if text.endswith("```"):
-                            text = text[:-3].strip()
-                    analysis = json.loads(text)
-                    paper.update(analysis)
-                    analysed.append(paper)
-                    rate_limit_failures = 0
-                    consecutive_failures = 0
-                    print(f"    → score: {analysis.get('relevance_score', '?')} (after retry)")
-                    continue
-                except Exception as retry_e:
-                    print(f"    Retry failed: {retry_e}")
-
-                paper.update(_default_analysis(paper))
-                analysed.append(paper)
-                if rate_limit_failures >= 2:
-                    print("  ⚠️  Gemini free-tier limit appears exhausted — try again later.")
-                    return None, "gemini_rate_limited"
-                continue
-
-            paper.update(_default_analysis(paper))
-            analysed.append(paper)
-
-            if consecutive_failures >= 3:
-                print("  ⚠️  3 consecutive Gemini failures — switching to fallback...")
-                return None, "gemini_errors"
-
-    return _filter_and_sort(analysed, config), None
 
 
 def _fallback_analyse(papers: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1252,42 +1155,24 @@ def _filter_and_sort(analysed: list[dict[str, Any]], config: dict[str, Any]) -> 
 
 
 def analyse_papers(papers: list[dict[str, Any]], config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-    """Dispatch to the best available AI backend, with cascade on failure.
+    """Dispatch to Claude for scoring, falling back to keyword-only on failure.
     Returns (scored_papers, scoring_method) where scoring_method is one of:
-    'claude', 'gemini', 'keywords', or 'keywords_fallback'."""
+    'claude', 'keywords', or 'keywords_fallback'."""
     if not papers:
         return [], "none"
 
     api_key_claude = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    api_key_gemini = os.environ.get("GEMINI_API_KEY", "").strip()
 
-    # Try Claude first
     if api_key_claude and HAS_ANTHROPIC:
         print("  Using Claude for analysis...")
         result, error = _analyse_with_claude(papers, config, api_key_claude)
         if error is None:
             return result, "claude"
-        # Claude failed — cascade to Gemini or keywords
-        if api_key_gemini and HAS_GEMINI:
-            print("  Cascading to Gemini 2.0 Flash...")
-            g_result, g_error = _analyse_with_gemini(papers, config, api_key_gemini)
-            if g_error is None:
-                return g_result, "gemini"
-            return _fallback_analyse(papers, config), "gemini_rate_limited"
-        else:
-            print("  No Gemini key available — falling back to keyword-only scoring")
-            return _fallback_analyse(papers, config), "keywords_fallback"
+        print("  Claude unavailable — falling back to keyword-only scoring")
+        return _fallback_analyse(papers, config), "keywords_fallback"
 
-    # No Claude key — try Gemini
-    if api_key_gemini and HAS_GEMINI:
-        print("  Using Gemini 2.0 Flash for analysis...")
-        g_result, g_error = _analyse_with_gemini(papers, config, api_key_gemini)
-        if g_error is None:
-            return g_result, "gemini"
-        return _fallback_analyse(papers, config), "gemini_rate_limited"
-
-    # No AI keys at all
-    print("  ⚠️  No AI API key set — using keyword-only scoring")
+    # No Claude key — keyword-only scoring
+    print("  ⚠️  No ANTHROPIC_API_KEY set — using keyword-only scoring")
     return _fallback_analyse(papers, config), "keywords"
 
 
@@ -1762,21 +1647,14 @@ def _render_scoring_notice(scoring_method: str) -> str:
         return f"""
   <tr><td style="padding:12px 44px">
     <div style="background:{GOLD_WASH};border:1px solid {GOLD_LIGHT};border-radius:6px;padding:14px 18px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};text-align:center">
-      &#x26A0;&#xFE0F; <strong>AI scoring unavailable this run</strong> — your API key may be out of credits. Papers were scored by keyword matching only, so relevance scores may be less accurate. Top up at <a href="https://console.anthropic.com" style="color:{PINE}">console.anthropic.com</a> or add a free <a href="https://aistudio.google.com/apikey" style="color:{PINE}">Gemini API key</a> as backup.
+      &#x26A0;&#xFE0F; <strong>AI scoring unavailable this run</strong> — your API key may be out of credits or the API was unreachable. Papers were scored by keyword matching only, so relevance scores may be less accurate. Top up at <a href="https://console.anthropic.com" style="color:{PINE}">console.anthropic.com</a>.
     </div>
   </td></tr>"""
     elif scoring_method == "keywords":
         return f"""
     <tr><td style="padding:12px 44px">
         <div style="background:{PINE_WASH};border:1px solid {CARD_BORDER};border-radius:6px;padding:14px 18px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{WARM_GREY};text-align:center">
-            &#x1F4CA; Papers scored by keyword matching (no AI key configured). For smarter scoring, add an <code>ANTHROPIC_API_KEY</code> ($5 of credits will last hundreds of digests) or a free <code>GEMINI_API_KEY</code> to your repo secrets.
-        </div>
-    </td></tr>"""
-    elif scoring_method == "gemini_rate_limited":
-        return f"""
-    <tr><td style="padding:12px 44px">
-        <div style="background:{GOLD_WASH};border:1px solid {GOLD_LIGHT};border-radius:6px;padding:14px 18px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};text-align:center">
-            &#x23F3; <strong>Gemini free-tier limit reached</strong> — this run fell back to keyword scoring. Try again later when quota resets, or reduce manual reruns to avoid API spam.
+            &#x1F4CA; Papers scored by keyword matching (no AI key configured). For smarter scoring, add an <code>ANTHROPIC_API_KEY</code> to your repo secrets — $5 of credits will last hundreds of digests.
         </div>
     </td></tr>"""
     return ""
@@ -1830,7 +1708,7 @@ def _render_own_key_nudge(config: dict[str, Any], scoring_method: str) -> str:
     """Gentle nudge to get your own API key if using the shared community key."""
     if config.get("own_api_key"):
         return ""
-    if scoring_method not in {"claude", "gemini", "keywords_fallback", "gemini_rate_limited"}:
+    if scoring_method not in {"claude", "keywords_fallback"}:
         return ""
     github_repo = config.get("github_repo", "")
     secrets_url = f"https://github.com/{github_repo}/settings/secrets/actions" if github_repo else ""
@@ -1838,7 +1716,7 @@ def _render_own_key_nudge(config: dict[str, Any], scoring_method: str) -> str:
     return f"""
   <tr><td style="padding:8px 44px 0">
     <div style="background:{PINE_WASH};border:1px solid {CARD_BORDER};border-radius:6px;padding:12px 18px;font-family:'IBM Plex Sans',sans-serif;font-size:11px;color:{WARM_GREY};text-align:center">
-      &#x1F511; You are using a shared AI key — it works, but may be slower when many people run their digests at the same time. Get your own free <a href="https://aistudio.google.com/apikey" style="color:{PINE};text-decoration:none">Gemini API key</a> for faster, more reliable scoring.{secrets_link}
+      &#x1F511; You are using a shared AI key — it works, but may be slower when many people run their digests at the same time. Add your own <code>ANTHROPIC_API_KEY</code> for faster, more reliable scoring.{secrets_link}
     </div>
   </td></tr>"""
 
@@ -1877,11 +1755,9 @@ def _render_student_footer(config: dict[str, Any], scoring_method: str) -> str:
     </div>""" if service_links else ""
 
     scoring_labels = {
-        "claude": "Claude (Anthropic)",
-        "gemini": "Gemini 2.0 Flash (Google)",
+        "claude": "Claude Haiku (Anthropic)",
         "keywords": "keyword matching",
         "keywords_fallback": "keyword matching (AI unavailable)",
-        "gemini_rate_limited": "keyword matching (Gemini free-tier limit)",
         "none": "AI",
     }
     scoring_label = scoring_labels.get(scoring_method, "AI")
@@ -1949,11 +1825,9 @@ def _render_footer(config: dict[str, Any], scoring_method: str) -> str:
 
     # ── Scoring label ──
     scoring_labels = {
-        "claude": "Claude (Anthropic)",
-        "gemini": "Gemini 2.0 Flash (Google)",
+        "claude": "Claude Haiku (Anthropic)",
         "keywords": "keyword matching",
         "keywords_fallback": "keyword matching (AI unavailable)",
-        "gemini_rate_limited": "keyword matching (Gemini free-tier limit)",
         "none": "AI",
     }
     scoring_label = scoring_labels.get(scoring_method, "AI")

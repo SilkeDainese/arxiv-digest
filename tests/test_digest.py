@@ -887,13 +887,6 @@ class TestRenderHtml:
         html = render_html([], [], config, "March 01, 2025", scoring_method="keywords")
         assert "keyword matching" in html
 
-    def test_scoring_method_gemini_rate_limited_shows_try_later(self):
-        config = make_config()
-        html = render_html(
-            [], [], config, "March 01, 2025", scoring_method="gemini_rate_limited"
-        )
-        assert "Gemini free-tier limit reached" in html
-
     def test_github_repo_generates_self_service_links(self):
         config = make_config(github_repo="user/my-digest")
         html = render_html([], [], config, "March 01, 2025")
@@ -1156,65 +1149,37 @@ class TestAnalysePapersCascade:
     def test_no_api_keys_uses_keyword_fallback(self, tmp_stats_path):
         config = make_config(min_score=1, max_papers=10)
         p = make_paper(keyword_hits=50.0)
-        env = {
-            k: v
-            for k, v in os.environ.items()
-            if k not in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY")
-        }
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
         with patch.dict(os.environ, env, clear=True):
             result, method = d.analyse_papers([p], config)
         assert method == "keywords"
 
-    def test_claude_credit_error_cascades_to_gemini(self, tmp_stats_path):
-        """When Claude returns a credit error, should cascade to Gemini if key present."""
+    def test_claude_credit_error_cascades_to_keywords_fallback(self, tmp_stats_path):
+        """When Claude returns a credit error, should cascade to keyword fallback."""
         config = make_config(min_score=1, max_papers=10)
         p = make_paper(keyword_hits=50.0)
 
         def fake_claude(papers, cfg, key):
             return None, "claude_no_credits"
 
-        def fake_gemini(papers, cfg, key):
-            for paper in papers:
-                paper["relevance_score"] = 7
-                paper.update(
-                    {
-                        "plain_summary": "s",
-                        "why_interesting": "w",
-                        "highlight_phrase": "h",
-                        "emoji": "e",
-                        "kw_tags": [],
-                        "method_tags": [],
-                        "is_new_catalog": False,
-                        "cite_worthy": False,
-                        "new_result": None,
-                    }
-                )
-            return _filter_and_sort(papers, cfg), None
-
-        env = {"ANTHROPIC_API_KEY": "fake-key", "GEMINI_API_KEY": "fake-gemini-key"}
+        env = {"ANTHROPIC_API_KEY": "fake-key"}
         with patch.dict(os.environ, env):
             with patch.object(d, "HAS_ANTHROPIC", True):
-                with patch.object(d, "HAS_GEMINI", True):
-                    with patch.object(d, "_analyse_with_claude", fake_claude):
-                        with patch.object(d, "_analyse_with_gemini", fake_gemini):
-                            result, method = d.analyse_papers([p], config)
-        assert method == "gemini"
+                with patch.object(d, "_analyse_with_claude", fake_claude):
+                    result, method = d.analyse_papers([p], config)
+        assert method == "keywords_fallback"
 
-    def test_claude_error_no_gemini_key_uses_keywords(self):
+    def test_claude_error_uses_keywords_fallback(self):
         config = make_config(min_score=1, max_papers=10)
         p = make_paper(keyword_hits=50.0)
 
         def fake_claude(papers, cfg, key):
             return None, "claude_errors"
 
-        env = {"ANTHROPIC_API_KEY": "fake-key"}
-        env.pop("GEMINI_API_KEY", None)
-        with patch.dict(os.environ, env, clear=True):
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "fake-key"}):
-                with patch.object(d, "HAS_ANTHROPIC", True):
-                    with patch.object(d, "HAS_GEMINI", False):
-                        with patch.object(d, "_analyse_with_claude", fake_claude):
-                            result, method = d.analyse_papers([p], config)
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "fake-key"}, clear=True):
+            with patch.object(d, "HAS_ANTHROPIC", True):
+                with patch.object(d, "_analyse_with_claude", fake_claude):
+                    result, method = d.analyse_papers([p], config)
         assert method == "keywords_fallback"
 
 
