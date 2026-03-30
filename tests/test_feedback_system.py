@@ -330,12 +330,21 @@ class TestStudentRankingIntegration:
         result = select_student_papers(papers, ["stars"], 3)
         assert len(result) == 3
 
-    def test_package_filter_excludes_unmatched(self):
+    def test_package_filter_excludes_unmatched_non_astro(self):
+        """Non-astro-ph papers are excluded unless they match a selected package."""
         from student_digest import select_student_papers
-        p1 = make_paper(student_package_ids=["stars"])
-        p2 = make_paper(student_package_ids=["cosmology"])
-        result = select_student_papers([p1, p2], ["stars"], 10)
+        p_astro = make_paper(student_package_ids=["stars"])
+        p_ml = make_paper(category="stat.ML", student_package_ids=["methods_ml"])
+        result = select_student_papers([p_astro, p_ml], ["stars"], 10)
         assert len(result) == 1
+
+    def test_all_astro_papers_always_included(self):
+        """All astro-ph.* papers are candidates regardless of package match."""
+        from student_digest import select_student_papers
+        p_stars = make_paper(student_package_ids=["stars"])
+        p_cosmo = make_paper(student_package_ids=["cosmology"])
+        result = select_student_papers([p_stars, p_cosmo], ["stars"], 10)
+        assert len(result) == 2
 
 
 class TestFetchAggregateFeedback:

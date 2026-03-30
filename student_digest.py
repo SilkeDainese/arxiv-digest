@@ -105,7 +105,38 @@ Their astronomy background (completed + current courses):
 - Stars & Planets (completed): stellar evolution, HR diagrams, exoplanet detection (transits, radial velocity), photometry, spectroscopy basics, binary stars, stellar structure, nucleosynthesis in stars
 - Galaxies & Cosmology (taking now): Milky Way structure, dark matter, supermassive black holes, elliptical/spiral galaxies, Tully-Fisher, galaxy clusters, gravitational lensing, Friedmann equation, expanding universe, cosmological parameters, CMB, Big Bang nucleosynthesis
 
-What they do NOT know (avoid or explain): specialized subfields (superradiance, axions, magnetohydrodynamics), instrument-specific jargon (pipeline, reduction, calibration frames), paper-specific acronyms and survey names, advanced numerical methods, radiative transfer details
+Safe vocabulary (they know these — use freely): transit, radial velocity, spectroscopy, photometry, binary star, stellar evolution, main sequence, HR diagram, red giant, supernova, white dwarf, neutron star, black hole, dark matter, gravitational lensing, CMB, redshift, galaxy types, Milky Way, Tully-Fisher, nucleosynthesis.
+
+Jargon to replace (use the plain version):
+- asteroseismology → "star-interior measurements from oscillations"
+- metallicity / [Fe/H] → "metal content"
+- Rossby number → "rotation-activity ratio"
+- isochrone → "age track"
+- RGB/AGB/HB → spell out: "red giant branch" etc.
+- secondary eclipse → "planet passing behind the star"
+- phase curve → "brightness over a full orbit"
+- atmospheric retrieval → "inferring atmosphere composition from spectra"
+- Rossiter-McLaughlin / obliquity → "orbit-spin tilt"
+- photoevaporation → "atmosphere stripped by radiation"
+- Eddington luminosity → "maximum brightness from radiation pressure"
+- magnetar → "neutron star with extreme magnetic field"
+- kilonova → "flash from a neutron star merger"
+- FRB → "millisecond radio burst"
+- AGN feedback → "energy from black holes regulating star formation"
+- SFR → "star formation rate"
+- BAO → "sound-wave imprint in galaxy clustering"
+- photo-z → "colour-based distance estimate"
+- PSF → "how a point source blurs in an image"
+- SNR / S/N → "signal-to-noise"
+- MCMC → "parameter exploration method"
+- Bayesian posterior → "updated probability after fitting"
+- selection bias → "only detecting the brightest objects"
+- Any named survey (SDSS, DES, LSST, Euclid, TESS, Kepler) → describe briefly
+- "we constrain" → "we measured" or "we set a limit on"
+- "consistent with" → "agrees with"
+- "in tension with" → "disagrees with"
+- "archival data" → "existing public observations"
+- If you cannot simplify a term within 25 words, describe the result more broadly instead of keeping the jargon.
 
 Rules:
 - One sentence each, max 25 words
@@ -287,6 +318,56 @@ def _freshness_score(paper: dict[str, Any]) -> float:
         return 0.0
 
 
+_PRESTIGE_JOURNALS = [
+    # Order matters: check specific names before broad ones
+    ("nature astronomy", "Nature Astronomy"),
+    ("nature physics", "Nature Physics"),
+    ("nature communications", "Nature Comms"),
+    ("physical review letters", "PRL"),
+    ("annual review", "Annual Reviews"),
+    ("astronomy & astrophysics", "A&A"),
+    ("astrophysical journal letters", "ApJL"),
+    ("monthly notices", "MNRAS"),
+    # Broad patterns last — anchored to avoid "computer science", "natural" etc.
+    ("nature,", "Nature"),
+    ("nature ", "Nature"),
+    ("science,", "Science"),
+    ("science ", "Science"),
+]
+
+
+def detect_prestige(papers: list[dict[str, Any]]) -> None:
+    """Annotate papers published in high-impact journals with a prestige flag."""
+    for paper in papers:
+        journal = paper.get("journal_ref", "").lower()
+        if not journal:
+            continue
+        for pattern, label in _PRESTIGE_JOURNALS:
+            if pattern in journal:
+                paper["prestige_journal"] = label
+                break
+
+
+def _is_astronomy_relevant(paper: dict[str, Any]) -> bool:
+    """Guard against non-astronomy papers leaking into the student digest.
+
+    Papers from astro-ph.* always pass. Papers from other categories
+    (e.g. stat.ML, cs.LG) must match at least one astronomy-specific
+    track (not just methods_ml) or have AU colleague/author matches.
+    This prevents pure ML/stats papers from appearing in the digest
+    when the AI scorer is unavailable and keyword-only fallback is used.
+    """
+    if paper.get("category", "").startswith("astro-ph."):
+        return True
+    # Non-astronomy category: require evidence of real astronomy relevance
+    astro_packages = set(paper.get("student_package_ids", [])) - {"methods_ml"}
+    if astro_packages:
+        return True
+    if paper.get("colleague_matches") or paper.get("known_authors"):
+        return True
+    return False
+
+
 def annotate_student_packages(papers: list[dict[str, Any]]) -> None:
     """Annotate papers with matching student packages and AU-priority flags."""
     track_keywords = {
@@ -320,36 +401,82 @@ def annotate_student_packages(papers: list[dict[str, Any]]) -> None:
         )
 
 
+_MAX_METHODS_ML_PAPERS = 2  # Hard cap: never more than 2 methods/ML papers per digest
+_CORE_ASTRO_TRACKS = {"stars", "exoplanets", "galaxies", "cosmology", "high_energy", "solar_helio", "instrumentation"}
+
+
+def _is_ml_only_paper(paper: dict[str, Any]) -> bool:
+    """True if a paper is only relevant via methods_ml, not core astronomy."""
+    packages = set(paper.get("student_package_ids", []))
+    if not packages or packages == {"methods_ml"}:
+        return not paper.get("category", "").startswith("astro-ph.")
+    return False
+
+
 def select_student_papers(
     papers: list[dict[str, Any]], package_ids: list[str], max_papers_per_week: int
 ) -> list[dict[str, Any]]:
     """Return the ranked top papers for a student subscription.
 
-    Ranking uses four weighted signals (highest priority first):
-      1. AU relevance boost — AU telescopes, colleagues (binary)
-      2. Package/topic match — number of overlapping packages
-      3. Aggregate expert signal — net up/down votes from opted-in researchers
-      4. Freshness — newer papers rank higher among ties
+    ALL astro-ph.* papers are always eligible — this is an astronomy digest.
+    The student's chosen packages boost matching papers higher in the ranking
+    but never exclude unmatched astronomy papers. Non-astro-ph papers (e.g.
+    stat.ML) are only included if they match a selected package.
 
-    The AI relevance_score is also folded in as the base quality signal.
+    Ranking priority (highest first):
+      1. AU colleague/telescope papers (always top)
+      2. Prestige journal (Nature, Science, etc.)
+      3. Core astronomy category match
+      4. Methods-only penalty
+      5. Student's chosen package overlap (boost, not filter)
+      6. AI relevance score
+      7. Expert signal + freshness
+
+    Methods/ML papers are hard-capped at 2 per digest.
     """
     wanted = set(package_ids)
+
+    # All astro-ph papers are always candidates; non-astro-ph need a package match
     selected = [
         paper
         for paper in papers
-        if set(paper.get("student_package_ids", [])).intersection(wanted)
+        if paper.get("category", "").startswith("astro-ph.")
+        or set(paper.get("student_package_ids", [])).intersection(wanted)
     ]
-    selected.sort(
-        key=lambda paper: (
-            paper.get("student_au_priority", 0),                              # AU boost
-            paper.get("relevance_score", 0),                                  # AI quality
-            len(set(paper.get("student_package_ids", [])).intersection(wanted)),  # package overlap
-            paper.get("expert_net", 0),                                       # aggregate expert signal
-            _freshness_score(paper),                                          # freshness
-        ),
-        reverse=True,
-    )
-    return selected[:max_papers_per_week]
+
+    def _sort_key(paper: dict[str, Any]) -> tuple:
+        packages = set(paper.get("student_package_ids", []))
+        is_core_astro = int(paper.get("category", "").startswith("astro-ph."))
+        ml_only = int(_is_ml_only_paper(paper))
+        has_core_track = int(bool(packages.intersection(_CORE_ASTRO_TRACKS)))
+        has_prestige = int(bool(paper.get("prestige_journal")))
+        au_priority = paper.get("student_au_priority", 0)
+        package_overlap = len(packages.intersection(wanted))
+        return (
+            au_priority,                                                        # AU papers always first
+            has_prestige,                                                       # prestige journals next
+            is_core_astro + has_core_track,                                     # core astronomy topics
+            -ml_only,                                                           # penalise methods-only papers
+            package_overlap,                                                    # student's chosen tracks boost
+            paper.get("relevance_score", 0),                                    # AI quality
+            paper.get("expert_net", 0),                                         # aggregate expert signal
+            _freshness_score(paper),                                            # freshness
+        )
+
+    selected.sort(key=_sort_key, reverse=True)
+
+    # Apply hard cap on methods/ML papers
+    capped: list[dict[str, Any]] = []
+    ml_count = 0
+    for paper in selected:
+        if _is_ml_only_paper(paper):
+            if ml_count >= _MAX_METHODS_ML_PAPERS:
+                continue
+            ml_count += 1
+        capped.append(paper)
+        if len(capped) >= max_papers_per_week:
+            break
+    return capped
 
 
 def make_student_digest_config(base_config: dict[str, Any], subscription: dict[str, Any]) -> dict[str, Any]:
@@ -473,7 +600,18 @@ def main(argv: list[str] | None = None) -> int:
     annotate_student_packages(ranked_papers)
     detect_au_researchers(ranked_papers)
     detect_delights(ranked_papers)
+    detect_prestige(ranked_papers)
+    prestige_count = sum(1 for p in ranked_papers if p.get("prestige_journal"))
+    if prestige_count:
+        print(f"   ⭐ {prestige_count} paper(s) from high-impact journals")
     apply_aggregate_expert_signal(ranked_papers, aggregated)
+
+    # Guard: remove non-astronomy papers that only matched generic methods_ml keywords
+    pre_guard = len(ranked_papers)
+    ranked_papers = [p for p in ranked_papers if _is_astronomy_relevant(p)]
+    removed = pre_guard - len(ranked_papers)
+    if removed:
+        print(f"   🛡️  Removed {removed} non-astronomy paper(s) (category guard)")
 
     # Rewrite summaries for student readability (uses Haiku — cheap + fast)
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -527,16 +665,74 @@ def main(argv: list[str] | None = None) -> int:
         print("❌ Preview send failed.\n")
         return 1
 
+    # ─────── Pre-send validation ──────────────────────────────
+    print("\n🔒 Pre-send validation...")
+    validation_errors: list[str] = []
+    student_selections: dict[str, list[dict[str, Any]]] = {}
+
+    # 1. Papers must exist
+    if not ranked_papers:
+        validation_errors.append("No papers available — refusing to send empty digests")
+
+    # 2. Majority of papers must be from astro-ph (sanity check on the pool)
+    astro_count = sum(1 for p in ranked_papers if p.get("category", "").startswith("astro-ph."))
+    if ranked_papers and astro_count < len(ranked_papers) * 0.5:
+        validation_errors.append(
+            f"Only {astro_count}/{len(ranked_papers)} papers are astro-ph — "
+            "pool may be contaminated with non-astronomy papers"
+        )
+
+    # 3. Every active student must get papers (cache results to avoid double computation)
+    student_selections: dict[str, list[dict[str, Any]]] = {}
+    students_with_no_papers: list[str] = []
+    for sub in active_subscriptions:
+        email = normalise_email(sub["email"])
+        selected = select_student_papers(
+            ranked_papers, list(sub["package_ids"]), int(sub["max_papers_per_week"])
+        )
+        student_selections[email] = selected
+        if not selected:
+            students_with_no_papers.append(sub["email"])
+    if students_with_no_papers:
+        validation_errors.append(
+            f"{len(students_with_no_papers)} student(s) would get empty digests: "
+            + ", ".join(students_with_no_papers[:5])
+        )
+
+    # 4. Check for duplicate emails (would cause double-sending)
+    seen_emails: set[str] = set()
+    duplicates: list[str] = []
+    for sub in active_subscriptions:
+        email = normalise_email(sub["email"])
+        if email in seen_emails:
+            duplicates.append(email)
+        seen_emails.add(email)
+    if duplicates:
+        validation_errors.append(f"Duplicate student emails: {', '.join(duplicates)}")
+
+    if validation_errors:
+        print("\n❌ Pre-send validation FAILED:")
+        for err in validation_errors:
+            print(f"   • {err}")
+        print("\n   Aborting student digest send. Fix the issues above.")
+        return 1
+
+    print(f"   ✅ {len(ranked_papers)} astronomy papers, "
+          f"{len(active_subscriptions)} unique students, no empty digests")
+
     processed_count = 0
     skipped_count = 0
     failed_recipients: list[str] = []
     for subscription in active_subscriptions:
         try:
-            selected = select_student_papers(
-                ranked_papers,
-                list(subscription["package_ids"]),
-                int(subscription["max_papers_per_week"]),
-            )
+            email = normalise_email(subscription["email"])
+            selected = student_selections.get(email) if student_selections else None
+            if selected is None:
+                selected = select_student_papers(
+                    ranked_papers,
+                    list(subscription["package_ids"]),
+                    int(subscription["max_papers_per_week"]),
+                )
             if not selected:
                 print(f"   ↷ No matching papers for {subscription['email']} — skipping")
                 skipped_count += 1

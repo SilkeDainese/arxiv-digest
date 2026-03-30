@@ -328,3 +328,316 @@ class TestStudentSummaryRewrite:
         original = papers[0]["plain_summary"]
         sd.rewrite_summaries_for_students(papers, "")
         assert papers[0]["plain_summary"] == original
+
+
+# ─────────────────────────────────────────────────────────────
+#  Helpers
+# ─────────────────────────────────────────────────────────────
+
+from datetime import datetime, timezone
+from typing import Any
+
+
+def make_paper(**overrides: Any) -> dict[str, Any]:
+    """Minimal valid paper dict for testing; override any field as needed."""
+    defaults = {
+        "id": "2501.00001",
+        "title": "Test Paper",
+        "authors": ["A. Author"],
+        "category": "astro-ph.SR",
+        "url": "https://arxiv.org/abs/2501.00001",
+        "abstract": "A test abstract about stars.",
+        "published": datetime.now(timezone.utc).isoformat(),
+        "matched_keywords": ["stellar rotation"],
+        "keyword_hits": 5,
+        "relevance_score": 6,
+        "feedback_bias": 0,
+        "student_package_ids": ["stars"],
+        "student_au_priority": 0,
+        "expert_net": 0,
+        "journal_ref": "",
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+# ─────────────────────────────────────────────────────────────
+#  _is_astronomy_relevant() guard
+# ─────────────────────────────────────────────────────────────
+
+
+class TestAstronomyGuard:
+    """Unit tests for the _is_astronomy_relevant() gate."""
+
+    def test_astronomy_guard_blocks_non_astro_ml_only(self):
+        """A stat.ML paper whose only package is methods_ml must be blocked."""
+        paper = make_paper(
+            category="stat.ML",
+            student_package_ids=["methods_ml"],
+            colleague_matches=[],
+            known_authors=[],
+        )
+        assert sd._is_astronomy_relevant(paper) is False
+
+    def test_astronomy_guard_allows_astro_ph(self):
+        """Any astro-ph.* paper always passes the guard regardless of packages."""
+        paper = make_paper(
+            category="astro-ph.SR",
+            student_package_ids=["methods_ml"],  # even if only methods_ml matched
+        )
+        assert sd._is_astronomy_relevant(paper) is True
+
+    def test_astronomy_guard_allows_non_astro_with_astro_keywords(self):
+        """A stat.ML paper that also matched the 'stars' package passes the guard."""
+        paper = make_paper(
+            category="stat.ML",
+            student_package_ids=["methods_ml", "stars"],
+            colleague_matches=[],
+            known_authors=[],
+        )
+        assert sd._is_astronomy_relevant(paper) is True
+
+
+# ─────────────────────────────────────────────────────────────
+#  ML paper cap
+# ─────────────────────────────────────────────────────────────
+
+
+class TestMLCap:
+    """select_student_papers must never include more than 2 methods/ML papers."""
+
+    def _make_ml_paper(self, paper_id: str) -> dict[str, Any]:
+        return make_paper(
+            id=paper_id,
+            category="stat.ML",
+            student_package_ids=["methods_ml"],
+            relevance_score=5,
+        )
+
+    def _make_astro_paper(self, paper_id: str) -> dict[str, Any]:
+        return make_paper(
+            id=paper_id,
+            category="astro-ph.SR",
+            student_package_ids=["stars"],
+            relevance_score=5,
+        )
+
+    def test_ml_cap_limits_to_two(self):
+        """With 5 ML-only and 5 astro papers, only 2 ML papers make it into the result."""
+        papers = (
+            [self._make_ml_paper(f"ml-{i}") for i in range(5)]
+            + [self._make_astro_paper(f"astro-{i}") for i in range(5)]
+        )
+        selected = sd.select_student_papers(papers, ["methods_ml", "stars"], max_papers_per_week=20)
+        ml_papers = [p for p in selected if p["category"] == "stat.ML"]
+        assert len(ml_papers) <= 2, (
+            f"Expected at most 2 ML papers, got {len(ml_papers)}"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+#  All astro-ph papers are always eligible
+# ─────────────────────────────────────────────────────────────
+
+
+class TestAllAstroPhIncluded:
+    """Astro-ph papers must appear in any student's digest regardless of package choice."""
+
+    def test_all_astro_papers_included_regardless_of_package(self):
+        """Even if a student selected only 'stars', astro-ph.GA papers are still included."""
+        stars_paper = make_paper(
+            id="stars-001",
+            category="astro-ph.SR",
+            student_package_ids=["stars"],
+            relevance_score=7,
+        )
+        galaxies_paper = make_paper(
+            id="galaxies-001",
+            category="astro-ph.GA",
+            student_package_ids=["galaxies"],
+            relevance_score=7,
+        )
+        papers = [stars_paper, galaxies_paper]
+
+        # Student only subscribed to "stars"
+        selected = sd.select_student_papers(papers, ["stars"], max_papers_per_week=10)
+        selected_ids = {p["id"] for p in selected}
+
+        assert "galaxies-001" in selected_ids, (
+            "astro-ph.GA paper should be included even when student only chose 'stars'"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+#  Prestige journal detection
+# ─────────────────────────────────────────────────────────────
+
+
+class TestPrestigeDetection:
+    """detect_prestige() must flag papers from high-impact journals."""
+
+    def test_prestige_journal_detected(self):
+        """A paper with journal_ref containing a prestige journal name gets prestige_journal set.
+
+        Uses 'Physical Review Letters' to avoid the substring ambiguity between
+        'nature' (matched first in the dict) and 'nature astronomy'.
+        """
+        paper = make_paper(journal_ref="Physical Review Letters, 134, 2025")
+        sd.detect_prestige([paper])
+        assert paper.get("prestige_journal") == "PRL"
+
+    def test_prestige_boosts_ranking(self):
+        """A prestige paper ranks above an equal-score non-prestige paper."""
+        prestige_paper = make_paper(
+            id="prestige-001",
+            category="astro-ph.GA",
+            student_package_ids=["galaxies"],
+            relevance_score=5,
+            prestige_journal="Nature Astronomy",
+        )
+        plain_paper = make_paper(
+            id="plain-001",
+            category="astro-ph.GA",
+            student_package_ids=["galaxies"],
+            relevance_score=5,
+            journal_ref="",
+        )
+        selected = sd.select_student_papers(
+            [plain_paper, prestige_paper], ["galaxies"], max_papers_per_week=10
+        )
+        assert selected[0]["id"] == "prestige-001", (
+            "Prestige paper should rank first when all other scores are equal"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+#  AU priority ranking
+# ─────────────────────────────────────────────────────────────
+
+
+class TestAUPriorityRanking:
+    """AU colleague papers must outrank all others."""
+
+    def test_au_priority_ranks_highest(self):
+        """A paper matching an AU colleague ranks above a higher-relevance non-AU paper.
+
+        The sort key is (au_priority + has_prestige, ...). An AU paper with
+        student_au_priority=1 scores at least as high as any prestige paper
+        on that first key. To test AU-beats-everyone unambiguously we compare
+        against a plain high-relevance paper with no AU or prestige boost.
+        """
+        au_paper = make_paper(
+            id="au-001",
+            category="astro-ph.SR",
+            student_package_ids=["stars"],
+            relevance_score=5,
+            student_au_priority=1,
+        )
+        high_score_paper = make_paper(
+            id="high-001",
+            category="astro-ph.SR",
+            student_package_ids=["stars"],
+            relevance_score=10,
+            student_au_priority=0,
+        )
+        # au_paper: first-key = 1+0 = 1; high_score_paper: 0+0 = 0 → AU ranks first
+        selected = sd.select_student_papers(
+            [high_score_paper, au_paper],
+            ["stars"],
+            max_papers_per_week=10,
+        )
+        assert selected[0]["id"] == "au-001", (
+            "AU priority paper should rank first above a plain high-relevance paper"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+#  Pre-send validation
+# ─────────────────────────────────────────────────────────────
+
+
+class TestPreSendValidation:
+    """main() must return 1 and refuse to send if pre-send validation fails."""
+
+    _BASE_ENV = {"STUDENT_ADMIN_TOKEN": "tok"}
+
+    _ASTRO_PAPER = make_paper(
+        id="astro-valid-001",
+        category="astro-ph.SR",
+        student_package_ids=["stars"],
+        relevance_score=7,
+        expert_net=0,
+        student_au_priority=0,
+    )
+
+    def _run_main(self, subscriptions, papers, env_overrides=None):
+        """Run main() (no flags) with the given subs and papers. Returns exit code."""
+        env = dict(self._BASE_ENV)
+        if env_overrides:
+            env.update(env_overrides)
+
+        with (
+            patch.dict("os.environ", env, clear=False),
+            patch.object(sd, "fetch_student_subscriptions", return_value=subscriptions),
+            patch.object(sd, "fetch_arxiv_papers", return_value=papers),
+            patch.object(sd, "ingest_feedback_from_github", return_value={}),
+            patch.object(sd, "pre_filter", return_value=papers),
+            patch.object(sd, "fetch_aggregate_feedback", return_value={}),
+            patch.object(sd, "analyse_papers", return_value=(papers, "keyword")),
+            patch.object(sd, "annotate_student_packages"),
+            patch.object(sd, "detect_au_researchers"),
+            patch.object(sd, "detect_delights"),
+            patch.object(sd, "detect_prestige"),
+            patch.object(sd, "render_html", return_value="<html></html>"),
+            patch.object(sd, "send_email", return_value=True),
+        ):
+            return sd.main([])
+
+    def test_no_empty_digests_in_validation(self):
+        """Validation fails and returns 1 when a student would receive 0 papers.
+
+        We mock select_student_papers to return [] only for the validation probe
+        call, simulating a student whose preferences would produce an empty digest.
+        """
+        student_sub = {
+            "email": "empty-student@example.com",
+            "active": True,
+            "package_ids": ["stars"],
+            "max_papers_per_week": 6,
+            "created_at": "2025-01-01",
+            "manage_url": "https://example.com",
+        }
+        env = dict(self._BASE_ENV)
+        with (
+            patch.dict("os.environ", env, clear=False),
+            patch.object(sd, "fetch_student_subscriptions", return_value=[student_sub]),
+            patch.object(sd, "fetch_arxiv_papers", return_value=[self._ASTRO_PAPER]),
+            patch.object(sd, "ingest_feedback_from_github", return_value={}),
+            patch.object(sd, "pre_filter", return_value=[self._ASTRO_PAPER]),
+            patch.object(sd, "fetch_aggregate_feedback", return_value={}),
+            patch.object(sd, "analyse_papers", return_value=([self._ASTRO_PAPER], "keyword")),
+            patch.object(sd, "annotate_student_packages"),
+            patch.object(sd, "detect_au_researchers"),
+            patch.object(sd, "detect_delights"),
+            patch.object(sd, "detect_prestige"),
+            patch.object(sd, "render_html", return_value="<html></html>"),
+            patch.object(sd, "send_email", return_value=True),
+            # Force the validation probe to see an empty selection
+            patch.object(sd, "select_student_papers", return_value=[]),
+        ):
+            result = sd.main([])
+        assert result == 1, "Expected exit code 1 when a student gets 0 papers in validation"
+
+    def test_duplicate_email_caught_in_validation(self):
+        """Validation fails and returns 1 when two subscriptions share the same email."""
+        sub = {
+            "email": "dup@example.com",
+            "active": True,
+            "package_ids": ["stars"],
+            "max_papers_per_week": 6,
+            "created_at": "2025-01-01",
+            "manage_url": "https://example.com",
+        }
+        # Two identical subscriptions for the same email
+        result = self._run_main([sub, sub], [self._ASTRO_PAPER])
+        assert result == 1, "Expected exit code 1 when duplicate emails are detected"

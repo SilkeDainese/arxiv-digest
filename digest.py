@@ -722,6 +722,10 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
             matched_keywords = _matched_keywords_for_text(title + " " + abstract, config)
             kw_hits_raw = sum(config["keywords"][kw] for kw in matched_keywords)
 
+            # Capture journal reference if available (e.g. "Nature Astronomy", "Science")
+            journal_ref_el = entry.find("{http://arxiv.org/schemas/atom}journal_ref")
+            journal_ref = (journal_ref_el.text or "").strip() if journal_ref_el is not None else ""
+
             papers.append({
                 "id": arxiv_id,
                 "title": title,
@@ -737,6 +741,7 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "is_own_paper": is_own_paper,
                 "matched_keywords": matched_keywords,
                 "keyword_hits_raw": kw_hits_raw,
+                "journal_ref": journal_ref,
                 "feedback_bias": 0,
             })
 
@@ -976,9 +981,14 @@ def pre_filter(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if filtered:
         print(f"   {len(filtered)} matched keywords/authors (sending top 30 to AI)")
         return filtered[:30]
-    # Discovery mode: no keyword/author matches — return newest papers
+    # Discovery mode: no keyword/author matches — prefer astro-ph papers
     print("  No keyword matches — discovery mode: showing newest papers")
-    discovery = sorted(papers, key=lambda p: p.get("published", ""), reverse=True)
+    astro = [p for p in papers if p.get("category", "").startswith("astro-ph.")]
+    if astro:
+        print(f"   Preferring {len(astro)} astro-ph papers in discovery mode")
+        discovery = sorted(astro, key=lambda p: p.get("published", ""), reverse=True)
+    else:
+        discovery = sorted(papers, key=lambda p: p.get("published", ""), reverse=True)
     return discovery[:30]
 
 

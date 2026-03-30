@@ -232,6 +232,30 @@ AU_ASTRONOMY_PEOPLE = [
         "match": ["Winther, M", "Mark Winther", "Mark L Winther", "Mark Lykke Winther"],
         "note": "AU astronomy researcher.",
     },
+    {
+        "name": "Jørgen Christensen-Dalsgaard",
+        "match": [
+            "Christensen-Dalsgaard, J",
+            "J. Christensen-Dalsgaard",
+            "Jørgen Christensen-Dalsgaard",
+        ],
+        "note": "Emeritus professor; founder of asteroseismology, stellar oscillations.",
+    },
+    {
+        "name": "Steen Hannestad",
+        "match": ["Hannestad, S", "Steen Hannestad"],
+        "note": "Professor; cosmology, neutrino physics, dark energy.",
+    },
+    {
+        "name": "Thomas Tram",
+        "match": ["Tram, T", "Thomas Tram"],
+        "note": "Associate professor; cosmology, Boltzmann solvers, neutrino cosmology.",
+    },
+    {
+        "name": "Maximilian Stritzinger",
+        "match": ["Stritzinger, M", "Maximilian Stritzinger", "Max Stritzinger"],
+        "note": "Associate professor; supernovae, stellar explosions, distance ladder.",
+    },
 ]
 
 AU_STUDENT_TELESCOPE_KEYWORDS = {
