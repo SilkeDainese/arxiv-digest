@@ -671,19 +671,20 @@ def main(argv: list[str] | None = None) -> int:
         print("\n📝 Rewriting summaries for students...")
         rewrite_summaries_for_students(ranked_papers, anthropic_key)
 
-    # FAIL-SAFE: check that summaries were actually rewritten. If >50% are
-    # over 200 chars, the rewrite likely failed and students would get raw
-    # abstract fragments. Alert admin but don't abort — AI-scored papers with
-    # original summaries are still better than nothing.
+    # FAIL-SAFE: if >50% of summaries are still over 200 chars, the rewrite
+    # likely failed and students would get raw abstract fragments. Abort.
     long_summaries = [p for p in ranked_papers if len(p.get("plain_summary", "")) > 200]
     if len(long_summaries) > len(ranked_papers) * 0.5 and not args.preview:
-        _send_admin_alert(
-            "Summary rewrite may have failed",
-            f"{len(long_summaries)}/{len(ranked_papers)} papers still have long summaries "
-            "(>200 chars), suggesting the student rewrite did not run.\n"
-            "The digest was still sent with AI-scored papers, but summaries may be too technical.\n"
-            "Check the workflow logs for rewrite errors.",
+        msg = (
+            f"Summary rewrite failed — {len(long_summaries)}/{len(ranked_papers)} papers "
+            "still have raw technical summaries (>200 chars).\n"
+            "Student digest aborted to avoid sending jargon-heavy content.\n\n"
+            "Check ANTHROPIC_API_KEY and Claude API status, then re-trigger:\n"
+            '  gh workflow run "AU Student Digest" --repo SilkeDainese/my-arxiv-digest'
         )
+        print(f"\n❌ {msg}")
+        _send_admin_alert("Summary rewrite failed — digest not sent", msg)
+        return 1
 
     print(f"   {len(ranked_papers)} papers available for student selection ({scoring_method})")
 
