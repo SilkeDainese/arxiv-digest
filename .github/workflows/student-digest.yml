@@ -51,6 +51,8 @@ jobs:
           DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           STUDENT_ADMIN_TOKEN: ${{ secrets.STUDENT_ADMIN_TOKEN }}
           STUDENT_TOKEN_SECRET: ${{ secrets.STUDENT_TOKEN_SECRET }}
           STUDENT_MANAGE_URL: ${{ vars.STUDENT_MANAGE_URL }}
