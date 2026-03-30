@@ -269,6 +269,77 @@ class TestWelcomeHeader:
 
 
 # ─────────────────────────────────────────────────────────────
+#  fetch_student_subscriptions — welcome_sent preservation
+# ─────────────────────────────────────────────────────────────
+
+
+class TestWelcomeSentPreservation:
+    """welcome_sent=False from the relay must survive normalisation and reach make_student_digest_config."""
+
+    def _make_relay_response(self, welcome_sent: bool) -> dict:
+        return {
+            "subscriptions": [
+                {
+                    "email": "new-student@example.com",
+                    "package_ids": ["exoplanets"],
+                    "max_papers_per_week": 6,
+                    "active": True,
+                    "welcome_sent": welcome_sent,
+                }
+            ]
+        }
+
+    def _fetch_with_relay(self, welcome_sent: bool) -> list[dict]:
+        """Call fetch_student_subscriptions() with a mocked relay response."""
+        import json
+        import io
+
+        fake_response_body = json.dumps(self._make_relay_response(welcome_sent)).encode("utf-8")
+
+        class _FakeResponse:
+            def read(self):
+                return fake_response_body
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                pass
+
+        with (
+            patch.dict("os.environ", {"STUDENT_ADMIN_TOKEN": "test-token"}, clear=False),
+            patch("urllib.request.urlopen", return_value=_FakeResponse()),
+        ):
+            return sd.fetch_student_subscriptions()
+
+    def test_welcome_sent_false_preserved_through_normalisation(self):
+        """When the relay returns welcome_sent=False, fetch_student_subscriptions preserves it."""
+        subscriptions = self._fetch_with_relay(welcome_sent=False)
+        assert len(subscriptions) == 1
+        assert subscriptions[0].get("welcome_sent") is False, (
+            "welcome_sent=False must be preserved after normalise_public_subscription()"
+        )
+
+    def test_welcome_sent_false_causes_show_welcome_in_config(self):
+        """End-to-end: relay returns welcome_sent=False → make_student_digest_config sets show_welcome=True."""
+        subscriptions = self._fetch_with_relay(welcome_sent=False)
+        assert len(subscriptions) == 1
+        base = sd.build_student_base_config()
+        config = sd.make_student_digest_config(base, subscriptions[0])
+        assert config.get("show_welcome") is True, (
+            "show_welcome must be True when welcome_sent=False comes from the relay"
+        )
+
+    def test_welcome_sent_true_preserved_and_no_show_welcome(self):
+        """When the relay returns welcome_sent=True, show_welcome must NOT be set."""
+        subscriptions = self._fetch_with_relay(welcome_sent=True)
+        assert len(subscriptions) == 1
+        base = sd.build_student_base_config()
+        config = sd.make_student_digest_config(base, subscriptions[0])
+        assert not config.get("show_welcome"), (
+            "show_welcome must not be set when welcome_sent=True"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
 #  rewrite_summaries_for_students()
 # ─────────────────────────────────────────────────────────────
 

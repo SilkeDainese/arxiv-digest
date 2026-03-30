@@ -304,6 +304,14 @@ class TestFreshnessScore:
         from student_digest import _freshness_score
         assert _freshness_score(make_paper(published="")) == 0.0
 
+    def test_bare_date_string_is_nonzero(self):
+        """Bare date strings like "2026-03-25" must not silently return 0.0."""
+        from student_digest import _freshness_score
+        from datetime import date
+        today = date.today().isoformat()
+        score = _freshness_score(make_paper(published=today))
+        assert score > 0.0
+
 
 class TestStudentRankingIntegration:
     """Test the full 4-signal ranking pipeline."""

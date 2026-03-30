@@ -10,6 +10,7 @@ Created by Silke S. Dainese · dainese@phys.au.dk · silkedainese.github.io
 """
 from __future__ import annotations
 
+import copy
 import html as html_mod
 import os
 import json
@@ -1239,14 +1240,14 @@ def analyse_papers(papers: list[dict[str, Any]], config: dict[str, Any]) -> tupl
 
     if api_key_claude and HAS_ANTHROPIC:
         print("  Using Claude for analysis...")
-        result, error = _analyse_with_claude(papers, config, api_key_claude)
+        result, error = _analyse_with_claude(copy.deepcopy(papers), config, api_key_claude)
         if error is None:
             return result, "claude"
         print("  Claude unavailable — falling back to Vertex AI Gemini...")
 
     if HAS_VERTEX_GEMINI:
         print("  Using Vertex AI Gemini for analysis...")
-        result, error = _analyse_with_vertex_gemini(papers, config)
+        result, error = _analyse_with_vertex_gemini(copy.deepcopy(papers), config)
         if error is None:
             return result, "vertex_gemini"
         print("  Vertex AI Gemini unavailable — falling back to keyword-only scoring")

@@ -223,7 +223,13 @@ def fetch_student_subscriptions() -> list[dict[str, Any]]:
     subscriptions: list[dict[str, Any]] = []
     for raw_subscription in data.get("subscriptions", []):
         try:
-            subscriptions.append(normalise_public_subscription(raw_subscription))
+            normalised = normalise_public_subscription(raw_subscription)
+            # Preserve welcome_sent from the raw record — normalise_public_subscription
+            # intentionally strips internal fields, but we need this flag downstream
+            # in make_student_digest_config() to decide whether to show the welcome block.
+            if "welcome_sent" in raw_subscription:
+                normalised["welcome_sent"] = raw_subscription["welcome_sent"]
+            subscriptions.append(normalised)
         except (TypeError, ValueError) as exc:
             print(f"   ↷ Skipping invalid student subscription record: {exc}")
     return subscriptions
@@ -318,6 +324,10 @@ def _freshness_score(paper: dict[str, Any]) -> float:
     if not published:
         return 0.0
     try:
+        # Bare date strings (e.g. "2026-03-25") produce naive datetimes which
+        # cannot be compared to timezone-aware datetime.now(utc) in Python 3.12+.
+        if "T" not in published and "+" not in published:
+            published = published + "T00:00:00+00:00"
         pub_date = datetime.fromisoformat(published.replace("Z", "+00:00"))
         age_days = (datetime.now(timezone.utc) - pub_date).total_seconds() / 86400
         return max(0.0, 1.0 - age_days / 7.0)

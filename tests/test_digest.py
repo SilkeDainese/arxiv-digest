@@ -1227,6 +1227,50 @@ class TestAnalysePapersCascade:
                     result, method = d.analyse_papers([p], config)
         assert method == "keywords_fallback"
 
+    def test_claude_mid_batch_failure_does_not_pollute_papers_for_next_tier(self):
+        """Papers passed to a fallback tier must not carry Claude's partial mutations.
+
+        Regression test: before the deep-copy fix, _analyse_with_claude mutated
+        papers in-place via paper.update(analysis). A mid-batch failure left the
+        first N papers with Claude fields (e.g. kw_tags=["from-claude"]) already
+        embedded, so when Vertex AI or keyword fallback received those same
+        objects it inherited the hybrid state.
+        """
+        config = make_config(min_score=1, max_papers=10)
+        papers = [
+            make_paper(id=f"1234.{i:04d}", title=f"Paper {i}", keyword_hits=50.0)
+            for i in range(3)
+        ]
+
+        def fake_claude_mid_failure(papers_copy, cfg, key):
+            # Simulate Claude mutating the first paper then failing mid-batch.
+            papers_copy[0].update({
+                "kw_tags": ["from-claude"],
+                "relevance_score": 9,
+            })
+            return None, "claude_errors"
+
+        # Capture papers as received by Vertex AI.
+        received_by_vertex: list[dict] = []
+
+        def fake_vertex(papers_copy, cfg):
+            received_by_vertex.extend(papers_copy)
+            return None, "vertex_errors"  # also fail so we can inspect cleanly
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "fake-key"}, clear=True):
+            with patch.object(d, "HAS_ANTHROPIC", True):
+                with patch.object(d, "HAS_VERTEX_GEMINI", True):
+                    with patch.object(d, "_analyse_with_claude", fake_claude_mid_failure):
+                        with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
+                            result, method = d.analyse_papers(papers, config)
+
+        # Claude's "from-claude" tag must NOT appear in any paper that Vertex received.
+        for p in received_by_vertex:
+            assert p.get("kw_tags") != ["from-claude"], (
+                f"Paper '{p['id']}' arrived at Vertex AI with Claude's partial "
+                "mutation — deep-copy guard is not working."
+            )
+
 
 # ─────────────────────────────────────────────────────────────
 #  Feedback parsing + bias
