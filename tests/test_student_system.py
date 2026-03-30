@@ -360,7 +360,7 @@ def test_student_digest_continues_after_send_failure(monkeypatch):
     monkeypatch.setattr(sd, "ingest_feedback_from_github", lambda config: {})
     monkeypatch.setattr(sd, "apply_feedback_bias", lambda papers, feedback_stats: None)
     monkeypatch.setattr(sd, "pre_filter", lambda papers: papers)
-    monkeypatch.setattr(sd, "analyse_papers", lambda papers, config: (papers, "keywords"))
+    monkeypatch.setattr(sd, "analyse_papers", lambda papers, config: (papers, "claude"))
     monkeypatch.setattr(
         sd,
         "render_html",
@@ -372,6 +372,7 @@ def test_student_digest_continues_after_send_failure(monkeypatch):
         return config["recipient_email"] != "first@example.com"
 
     monkeypatch.setattr(sd, "send_email", fake_send_email)
+    monkeypatch.setattr(sd, "_send_admin_alert", lambda subject, body: None)
 
     exit_code = sd.main([])
 
@@ -458,7 +459,7 @@ def test_student_digest_continues_after_unexpected_per_student_error(monkeypatch
     monkeypatch.setattr(sd, "ingest_feedback_from_github", lambda config: {})
     monkeypatch.setattr(sd, "apply_feedback_bias", lambda papers, feedback_stats: None)
     monkeypatch.setattr(sd, "pre_filter", lambda papers: papers)
-    monkeypatch.setattr(sd, "analyse_papers", lambda papers, config: (papers, "keywords"))
+    monkeypatch.setattr(sd, "analyse_papers", lambda papers, config: (papers, "claude"))
 
     def fake_render(papers, colleague_papers, config, date_str, own_papers, scoring_method):
         call_count[0] += 1
@@ -471,11 +472,77 @@ def test_student_digest_continues_after_unexpected_per_student_error(monkeypatch
         sd, "send_email",
         lambda html, paper_count, date_str, config, papers=None: sent.append(config["recipient_email"]) or True,
     )
+    monkeypatch.setattr(sd, "_send_admin_alert", lambda subject, body: None)
 
     exit_code = sd.main([])
 
     assert exit_code == 1  # one failure means exit code 1
     assert sent == ["ok@example.com"]
+
+
+# ─────── Failure state handling ───────────────────────────────
+
+def test_keyword_scoring_aborts_student_digest_and_alerts(monkeypatch):
+    """Keyword-only scoring should abort the student digest and send an admin alert."""
+    subscriptions = [
+        {"email": "student@example.com", "package_ids": ["exoplanets"],
+         "max_papers_per_week": 2, "active": True},
+    ]
+    papers = [make_paper(id="p1", matched_keywords=["exoplanet"], relevance_score=5)]
+    alerts = []
+
+    monkeypatch.setattr(sd, "fetch_student_subscriptions", lambda: subscriptions)
+    monkeypatch.setattr(sd, "fetch_arxiv_papers", lambda config: papers)
+    monkeypatch.setattr(sd, "ingest_feedback_from_github", lambda config: {})
+    monkeypatch.setattr(sd, "apply_feedback_bias", lambda papers, fb: None)
+    monkeypatch.setattr(sd, "pre_filter", lambda papers: papers)
+    monkeypatch.setattr(sd, "analyse_papers", lambda papers, config: (papers, "keywords"))
+    monkeypatch.setattr(sd, "_send_admin_alert", lambda subject, body: alerts.append(subject))
+
+    exit_code = sd.main([])
+
+    assert exit_code == 1
+    assert len(alerts) == 1
+    assert "AI scoring failed" in alerts[0]
+
+
+def test_keyword_scoring_allowed_in_preview_mode(monkeypatch):
+    """Preview mode should not abort on keyword-only scoring."""
+    subscriptions = [
+        {"email": "student@example.com", "package_ids": ["exoplanets"],
+         "max_papers_per_week": 2, "active": True},
+    ]
+    papers = [make_paper(id="p1", matched_keywords=["exoplanet"], relevance_score=5)]
+
+    monkeypatch.setattr(sd, "fetch_student_subscriptions", lambda: subscriptions)
+    monkeypatch.setattr(sd, "fetch_arxiv_papers", lambda config: papers)
+    monkeypatch.setattr(sd, "ingest_feedback_from_github", lambda config: {})
+    monkeypatch.setattr(sd, "apply_feedback_bias", lambda papers, fb: None)
+    monkeypatch.setattr(sd, "pre_filter", lambda papers: papers)
+    monkeypatch.setattr(sd, "analyse_papers", lambda papers, config: (papers, "keywords"))
+
+    exit_code = sd.main(["--preview", "--preview-dir", "/tmp/test_previews"])
+
+    assert exit_code == 0
+
+
+def test_arxiv_fetch_failure_alerts_admin(monkeypatch):
+    """Empty arXiv fetch should send an admin alert."""
+    subscriptions = [
+        {"email": "student@example.com", "package_ids": ["exoplanets"],
+         "max_papers_per_week": 2, "active": True},
+    ]
+    alerts = []
+
+    monkeypatch.setattr(sd, "fetch_student_subscriptions", lambda: subscriptions)
+    monkeypatch.setattr(sd, "fetch_arxiv_papers", lambda config: [])
+    monkeypatch.setattr(sd, "_send_admin_alert", lambda subject, body: alerts.append(subject))
+
+    exit_code = sd.main([])
+
+    assert exit_code == 1
+    assert len(alerts) == 1
+    assert "arXiv fetch failed" in alerts[0]
 
 
 # ─────── Phase 1 UX redesign: student footer ─────────────────

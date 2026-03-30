@@ -54,6 +54,18 @@ FEEDBACK_RELAY_URL = os.environ.get(
 
 _SETTINGS_TOKEN_TTL = 7 * 86400  # 7 days
 
+# Admin email for failure alerts — receives notifications when the student
+# digest pipeline degrades or fails so it can be fixed before next week.
+_ADMIN_EMAIL = os.environ.get("STUDENT_ADMIN_EMAIL", "dainese@phys.au.dk").strip()
+
+
+def _send_admin_alert(subject_suffix: str, body: str) -> None:
+    """Best-effort alert email to admin when the student digest has problems."""
+    from digest import send_failure_report
+    config = {"recipient_email": _ADMIN_EMAIL}
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    send_failure_report(config, f"[Student Digest — {date_str}] {subject_suffix}\n\n{body}")
+
 
 def _generate_settings_token(email: str, secret: str) -> str:
     """Create an HMAC-signed settings token (mirrors relay/_registry.py logic)."""
@@ -594,8 +606,16 @@ def main(argv: list[str] | None = None) -> int:
     papers = fetch_arxiv_papers(base_config)
 
     if not papers:
-        print("\n⚠️  No papers fetched — all arXiv category requests failed or returned nothing.")
-        print("   Skipping student digests to avoid sending empty emails. Check the errors above.")
+        msg = (
+            "No papers fetched — all arXiv category requests failed or returned nothing.\n"
+            "This usually means arXiv rate-limited every request (HTTP 429).\n"
+            "The retry logic (10s/20s backoff) was not enough.\n\n"
+            "Try re-triggering in 30 minutes:\n"
+            '  gh workflow run "AU Student Digest" --repo SilkeDainese/my-arxiv-digest'
+        )
+        print(f"\n❌ {msg}")
+        if not args.preview:
+            _send_admin_alert("arXiv fetch failed — no papers", msg)
         return 1
 
     print("\n👍 Ingesting quick-feedback votes...")
@@ -614,6 +634,21 @@ def main(argv: list[str] | None = None) -> int:
 
     print("\n🤖 Analysing shared AU student pool...")
     ranked_papers, scoring_method = analyse_papers(candidates, base_config)
+
+    # FAIL-SAFE: keyword-only scoring produces raw truncated abstracts — not
+    # suitable for students. Abort and alert admin so it can be fixed manually.
+    if scoring_method in ("keywords", "keywords_fallback") and not args.preview:
+        msg = (
+            f"AI scoring failed — fell back to '{scoring_method}'.\n"
+            "Student digest aborted to avoid sending low-quality summaries.\n\n"
+            "All three AI tiers failed (Claude → Vertex AI → Gemini API).\n"
+            "Check API keys and service status, then re-trigger manually:\n"
+            '  gh workflow run "AU Student Digest" --repo SilkeDainese/my-arxiv-digest'
+        )
+        print(f"\n❌ {msg}")
+        _send_admin_alert("AI scoring failed — digest not sent", msg)
+        return 1
+
     annotate_student_packages(ranked_papers)
     detect_au_researchers(ranked_papers)
     detect_delights(ranked_papers)
@@ -635,6 +670,20 @@ def main(argv: list[str] | None = None) -> int:
     if anthropic_key:
         print("\n📝 Rewriting summaries for students...")
         rewrite_summaries_for_students(ranked_papers, anthropic_key)
+
+    # FAIL-SAFE: check that summaries were actually rewritten. If >50% are
+    # over 200 chars, the rewrite likely failed and students would get raw
+    # abstract fragments. Alert admin but don't abort — AI-scored papers with
+    # original summaries are still better than nothing.
+    long_summaries = [p for p in ranked_papers if len(p.get("plain_summary", "")) > 200]
+    if len(long_summaries) > len(ranked_papers) * 0.5 and not args.preview:
+        _send_admin_alert(
+            "Summary rewrite may have failed",
+            f"{len(long_summaries)}/{len(ranked_papers)} papers still have long summaries "
+            "(>200 chars), suggesting the student rewrite did not run.\n"
+            "The digest was still sent with AI-scored papers, but summaries may be too technical.\n"
+            "Check the workflow logs for rewrite errors.",
+        )
 
     print(f"   {len(ranked_papers)} papers available for student selection ({scoring_method})")
 
@@ -808,6 +857,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n✨ Sent {processed_count} student digest(s), skipped {skipped_count}.")
     if failed_recipients:
         print("❌ Failed recipients: " + ", ".join(failed_recipients))
+        _send_admin_alert(
+            f"{len(failed_recipients)} student email(s) failed to send",
+            f"The following students did not receive their digest:\n"
+            + "\n".join(f"  • {r}" for r in failed_recipients)
+            + "\n\nCheck SMTP logs. You can re-send to individual students:\n"
+            + '  gh workflow run "AU Student Digest" --repo SilkeDainese/my-arxiv-digest '
+            + f'-f recipient="{failed_recipients[0]}"',
+        )
         return 1
     print()
     return 0
