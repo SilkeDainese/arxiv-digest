@@ -1419,7 +1419,7 @@ class TestFetchArxivXmlParsing:
         """
         import inspect
 
-        source = inspect.getsource(d.fetch_arxiv_papers)
+        source = inspect.getsource(d._parse_arxiv_response)
         assert "except (AttributeError, TypeError, ValueError)" in source
 
     def test_deduplication_logic(self):

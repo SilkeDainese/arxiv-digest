@@ -598,6 +598,180 @@ def _categories_to_package_tags(categories: list[str]) -> list[str]:
 #  ARXIV FETCHING
 # ─────────────────────────────────────────────────────────────
 
+def _build_arxiv_query(category: str) -> str:
+    """Build the arXiv API URL for a given category."""
+    params = {
+        "search_query": f"cat:{category}",
+        "start": 0,
+        "max_results": 100,
+        "sortBy": "submittedDate",
+        "sortOrder": "descending",
+    }
+    return "https://export.arxiv.org/api/query?" + urllib.parse.urlencode(params)
+
+
+def _execute_arxiv_request(url: str, category: str) -> str | None:
+    """Execute the request to the arXiv API, handling rate limits and errors."""
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "arxiv-digest/1.0 (GitHub Actions; https://github.com/SilkeDainese/arxiv-digest)")
+
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return response.read().decode("utf-8")
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 2:
+                wait = 10 * (attempt + 1)
+                print(f"  ⏳ Rate limited on {category}, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            print(f"  ⚠️  Error fetching {category}: {e}")
+        except Exception as e:
+            print(f"  ⚠️  Error fetching {category}: {e}")
+            break
+    return None
+
+
+def _parse_arxiv_response(xml_data: str, category: str, config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Parse the arXiv API XML response and extract paper metadata."""
+    papers = []
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError as exc:
+        print(f"  ⚠️  Failed to parse arXiv XML for {category}: {exc}")
+        return papers
+    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    cutoff = datetime.now(timezone.utc) - timedelta(days=config["days_back"])
+
+    all_entries = root.findall("atom:entry", ns)
+    skipped_malformed = 0
+    for entry in all_entries:
+        try:
+            published_str = entry.find("atom:published", ns).text
+            published = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+            if published < cutoff:
+                continue
+
+            arxiv_id = entry.find("atom:id", ns).text.split("/abs/")[-1]
+            title = (entry.find("atom:title", ns).text or "").strip().replace("\n", " ")
+            abstract = (entry.find("atom:summary", ns).text or "").strip().replace("\n", " ")
+            authors = [a.find("atom:name", ns).text for a in entry.findall("atom:author", ns) if a.find("atom:name", ns) is not None and a.find("atom:name", ns).text]
+        except (AttributeError, TypeError, ValueError):
+            skipped_malformed += 1
+            continue
+
+        # Use the paper's actual primary category, not the query category
+        primary_cat_el = entry.find("{http://arxiv.org/schemas/atom}primary_category")
+        paper_category = (
+            primary_cat_el.get("term", category)
+            if primary_cat_el is not None
+            else category
+        )
+
+        # Check research authors (relevance boost)
+        known_flag = []
+        for author in authors:
+            for known in config["research_authors"]:
+                if known.lower() in author.lower():
+                    known_flag.append(author)
+                    break
+
+        # Check colleagues — people matches
+        colleague_flag = []
+        colleague_details: list[dict[str, str]] = []
+        for author in authors:
+            for colleague in config["colleagues"]["people"]:
+                for pattern in colleague.get("match", []):
+                    if pattern.lower() in author.lower():
+                        colleague_name = colleague.get("name", "Unknown")
+                        if colleague_name not in colleague_flag:
+                            colleague_flag.append(colleague_name)
+                        detail = {"name": colleague_name}
+                        note = str(colleague.get("note", "")).strip()
+                        if note and not any(
+                            existing.get("name") == colleague_name
+                            for existing in colleague_details
+                        ):
+                            detail["note"] = note
+                            colleague_details.append(detail)
+                        elif not note and not any(
+                            existing.get("name") == colleague_name
+                            for existing in colleague_details
+                        ):
+                            colleague_details.append(detail)
+                        break
+
+        # Check colleagues — institutional matches (arXiv affiliation XML + abstract fallback)
+        affiliations = []
+        author_affiliations: dict[str, list[str]] = {}
+        ns_arxiv = {"arxiv": "http://arxiv.org/schemas/atom"}
+        for author_el in entry.findall("atom:author", ns):
+            author_name = author_el.findtext("atom:name", "", ns)
+            affs = [
+                aff_el.text
+                for aff_el in author_el.findall("arxiv:affiliation", ns_arxiv)
+                if aff_el.text
+            ]
+            if affs and author_name:
+                author_affiliations[author_name] = affs
+            affiliations.extend(affs)
+        affiliation_text = " ".join(affiliations).lower()
+        text_lower = (title + " " + abstract).lower()
+        for inst in config["colleagues"].get("institutions", []):
+            inst_lower = inst.lower()
+            if inst_lower in affiliation_text or inst_lower in text_lower:
+                if inst not in colleague_flag:
+                    colleague_flag.append(inst)
+                if not any(
+                    existing.get("name") == inst for existing in colleague_details
+                ):
+                    colleague_details.append({"name": inst})
+
+        # Check if this is the user's own paper
+        is_own_paper = False
+        for pattern in config.get("self_match", []):
+            for author in authors:
+                if pattern.lower() in author.lower():
+                    is_own_paper = True
+                    break
+            if is_own_paper:
+                break
+
+        # Weighted keyword scoring (raw sum)
+        matched_keywords = _matched_keywords_for_text(title + " " + abstract, config)
+        kw_hits_raw = sum(config["keywords"][kw] for kw in matched_keywords)
+
+        # Capture journal reference if available (e.g. "Nature Astronomy", "Science")
+        journal_ref_el = entry.find("{http://arxiv.org/schemas/atom}journal_ref")
+        journal_ref = (journal_ref_el.text or "").strip() if journal_ref_el is not None else ""
+
+        papers.append({
+            "id": arxiv_id,
+            "title": title,
+            "abstract": abstract,
+            "authors": authors,
+            "author_affiliations": author_affiliations,
+            "published": published.strftime("%Y-%m-%d"),
+            "category": paper_category,
+            "url": f"https://arxiv.org/abs/{arxiv_id}",
+            "known_authors": known_flag,
+            "colleague_matches": colleague_flag,
+            "colleague_details": colleague_details,
+            "is_own_paper": is_own_paper,
+            "matched_keywords": matched_keywords,
+            "keyword_hits_raw": kw_hits_raw,
+            "journal_ref": journal_ref,
+            "feedback_bias": 0,
+        })
+
+    if skipped_malformed:
+        print(f"  ⚠️  Skipped {skipped_malformed} malformed entries in {category}")
+    if skipped_malformed == len(all_entries) and all_entries:
+        print(f"  ⚠️  ALL entries from {category} were malformed — arXiv API format may have changed")
+
+    return papers
+
+
 def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
     """Fetch recent papers from the arXiv API for configured categories.
 
@@ -612,171 +786,15 @@ def fetch_arxiv_papers(config: dict[str, Any]) -> list[dict[str, Any]]:
         if i > 0:
             time.sleep(3)  # arXiv etiquette: pause between requests
 
-        params = {
-            "search_query": f"cat:{category}",
-            "start": 0,
-            "max_results": 100,
-            "sortBy": "submittedDate",
-            "sortOrder": "descending",
-        }
-        url = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode(params)
+        url = _build_arxiv_query(category)
         print(f"  Fetching {category}...")
 
-        req = urllib.request.Request(url)
-        req.add_header("User-Agent", "arxiv-digest/1.0 (GitHub Actions; https://github.com/SilkeDainese/arxiv-digest)")
-
-        xml_data = None
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=30) as response:
-                    xml_data = response.read().decode("utf-8")
-                break
-            except urllib.error.HTTPError as e:
-                if e.code == 429 and attempt < 2:
-                    wait = 10 * (attempt + 1)
-                    print(f"  ⏳ Rate limited on {category}, retrying in {wait}s...")
-                    time.sleep(wait)
-                    continue
-                print(f"  ⚠️  Error fetching {category}: {e}")
-            except Exception as e:
-                print(f"  ⚠️  Error fetching {category}: {e}")
-                break
+        xml_data = _execute_arxiv_request(url, category)
         if xml_data is None:
             continue
 
-        try:
-            root = ET.fromstring(xml_data)
-        except ET.ParseError as exc:
-            print(f"  ⚠️  Failed to parse arXiv XML for {category}: {exc}")
-            continue
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        cutoff = datetime.now(timezone.utc) - timedelta(days=config["days_back"])
-
-        all_entries = root.findall("atom:entry", ns)
-        skipped_malformed = 0
-        for entry in all_entries:
-            try:
-                published_str = entry.find("atom:published", ns).text
-                published = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
-                if published < cutoff:
-                    continue
-
-                arxiv_id = entry.find("atom:id", ns).text.split("/abs/")[-1]
-                title = (entry.find("atom:title", ns).text or "").strip().replace("\n", " ")
-                abstract = (entry.find("atom:summary", ns).text or "").strip().replace("\n", " ")
-                authors = [a.find("atom:name", ns).text for a in entry.findall("atom:author", ns) if a.find("atom:name", ns) is not None and a.find("atom:name", ns).text]
-            except (AttributeError, TypeError, ValueError):
-                skipped_malformed += 1
-                continue
-
-            # Use the paper's actual primary category, not the query category
-            primary_cat_el = entry.find("{http://arxiv.org/schemas/atom}primary_category")
-            paper_category = (
-                primary_cat_el.get("term", category)
-                if primary_cat_el is not None
-                else category
-            )
-
-            # Check research authors (relevance boost)
-            known_flag = []
-            for author in authors:
-                for known in config["research_authors"]:
-                    if known.lower() in author.lower():
-                        known_flag.append(author)
-                        break
-
-            # Check colleagues — people matches
-            colleague_flag = []
-            colleague_details: list[dict[str, str]] = []
-            for author in authors:
-                for colleague in config["colleagues"]["people"]:
-                    for pattern in colleague.get("match", []):
-                        if pattern.lower() in author.lower():
-                            colleague_name = colleague.get("name", "Unknown")
-                            if colleague_name not in colleague_flag:
-                                colleague_flag.append(colleague_name)
-                            detail = {"name": colleague_name}
-                            note = str(colleague.get("note", "")).strip()
-                            if note and not any(
-                                existing.get("name") == colleague_name
-                                for existing in colleague_details
-                            ):
-                                detail["note"] = note
-                                colleague_details.append(detail)
-                            elif not note and not any(
-                                existing.get("name") == colleague_name
-                                for existing in colleague_details
-                            ):
-                                colleague_details.append(detail)
-                            break
-
-            # Check colleagues — institutional matches (arXiv affiliation XML + abstract fallback)
-            affiliations = []
-            author_affiliations: dict[str, list[str]] = {}
-            ns_arxiv = {"arxiv": "http://arxiv.org/schemas/atom"}
-            for author_el in entry.findall("atom:author", ns):
-                author_name = author_el.findtext("atom:name", "", ns)
-                affs = [
-                    aff_el.text
-                    for aff_el in author_el.findall("arxiv:affiliation", ns_arxiv)
-                    if aff_el.text
-                ]
-                if affs and author_name:
-                    author_affiliations[author_name] = affs
-                affiliations.extend(affs)
-            affiliation_text = " ".join(affiliations).lower()
-            text_lower = (title + " " + abstract).lower()
-            for inst in config["colleagues"].get("institutions", []):
-                inst_lower = inst.lower()
-                if inst_lower in affiliation_text or inst_lower in text_lower:
-                    if inst not in colleague_flag:
-                        colleague_flag.append(inst)
-                    if not any(
-                        existing.get("name") == inst for existing in colleague_details
-                    ):
-                        colleague_details.append({"name": inst})
-
-            # Check if this is the user's own paper
-            is_own_paper = False
-            for pattern in config.get("self_match", []):
-                for author in authors:
-                    if pattern.lower() in author.lower():
-                        is_own_paper = True
-                        break
-                if is_own_paper:
-                    break
-
-            # Weighted keyword scoring (raw sum)
-            matched_keywords = _matched_keywords_for_text(title + " " + abstract, config)
-            kw_hits_raw = sum(config["keywords"][kw] for kw in matched_keywords)
-
-            # Capture journal reference if available (e.g. "Nature Astronomy", "Science")
-            journal_ref_el = entry.find("{http://arxiv.org/schemas/atom}journal_ref")
-            journal_ref = (journal_ref_el.text or "").strip() if journal_ref_el is not None else ""
-
-            papers.append({
-                "id": arxiv_id,
-                "title": title,
-                "abstract": abstract,
-                "authors": authors,
-                "author_affiliations": author_affiliations,
-                "published": published.strftime("%Y-%m-%d"),
-                "category": paper_category,
-                "url": f"https://arxiv.org/abs/{arxiv_id}",
-                "known_authors": known_flag,
-                "colleague_matches": colleague_flag,
-                "colleague_details": colleague_details,
-                "is_own_paper": is_own_paper,
-                "matched_keywords": matched_keywords,
-                "keyword_hits_raw": kw_hits_raw,
-                "journal_ref": journal_ref,
-                "feedback_bias": 0,
-            })
-
-        if skipped_malformed:
-            print(f"  ⚠️  Skipped {skipped_malformed} malformed entries in {category}")
-        if skipped_malformed == len(all_entries) and all_entries:
-            print(f"  ⚠️  ALL entries from {category} were malformed — arXiv API format may have changed")
+        category_papers = _parse_arxiv_response(xml_data, category, config)
+        papers.extend(category_papers)
 
     # Deduplicate (same paper may appear in multiple categories)
     seen = set()
