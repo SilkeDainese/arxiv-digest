@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+import concurrent.futures
 
 DEFAULT_SETUP_URL = "https://arxiv-digest-production-93ba.up.railway.app"
 
@@ -1099,9 +1100,8 @@ def _analyse_with_claude(papers: list[dict[str, Any]], config: dict[str, Any], a
     client = anthropic.Anthropic(api_key=api_key)
     analysed = []
     consecutive_failures = 0
-    credit_error = False
 
-    for i, paper in enumerate(papers):
+    def process_paper(i, paper):
         print(f"  Analysing {i+1}/{len(papers)}: {paper['title'][:60]}...")
         prompt = _build_scoring_prompt(paper, config)
 
@@ -1117,29 +1117,38 @@ def _analyse_with_claude(papers: list[dict[str, Any]], config: dict[str, Any], a
                 text = re.sub(r"^```[a-z]*\n?", "", text)
                 text = re.sub(r"\n?```$", "", text)
             analysis = json.loads(text)
-            paper.update(analysis)
-            analysed.append(paper)
-            consecutive_failures = 0
-            print(f"    → score: {analysis.get('relevance_score', '?')}")
+            return (True, analysis, None)
         except Exception as e:
-            error_str = str(e)
-            print(f"    Error: {error_str}")
-            consecutive_failures += 1
+            return (False, None, str(e))
 
-            # Detect credit/billing errors — no point retrying
-            if "credit balance" in error_str.lower() or "billing" in error_str.lower():
-                credit_error = True
-                print("  ⚠️  Claude API credits exhausted — switching to fallback...")
-                # Return remaining papers unscored so the dispatcher can cascade
-                return None, "claude_no_credits"
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_paper = {executor.submit(process_paper, i, paper): paper for i, paper in enumerate(papers)}
+        for future in concurrent.futures.as_completed(future_to_paper):
+            paper = future_to_paper[future]
+            success, analysis, error_str = future.result()
+            if success:
+                paper.update(analysis)
+                analysed.append(paper)
+                consecutive_failures = 0
+                print(f"    → score: {analysis.get('relevance_score', '?')}")
+            else:
+                print(f"    Error: {error_str}")
+                consecutive_failures += 1
 
-            paper.update(_default_analysis(paper))
-            analysed.append(paper)
+                if "credit balance" in error_str.lower() or "billing" in error_str.lower():
+                    print("  ⚠️  Claude API credits exhausted — switching to fallback...")
+                    for f in future_to_paper:
+                        f.cancel()
+                    return None, "claude_no_credits"
 
-            # If 3+ consecutive failures, bail out (API might be down)
-            if consecutive_failures >= 3:
-                print("  ⚠️  3 consecutive Claude failures — switching to fallback...")
-                return None, "claude_errors"
+                paper.update(_default_analysis(paper))
+                analysed.append(paper)
+
+                if consecutive_failures >= 3:
+                    print("  ⚠️  3 consecutive Claude failures — switching to fallback...")
+                    for f in future_to_paper:
+                        f.cancel()
+                    return None, "claude_errors"
 
     return _filter_and_sort(analysed, config), None
 
@@ -1153,7 +1162,7 @@ def _analyse_with_vertex_gemini(papers: list[dict[str, Any]], config: dict[str, 
     analysed = []
     consecutive_failures = 0
 
-    for i, paper in enumerate(papers):
+    def process_paper(i, paper):
         print(f"  Analysing {i+1}/{len(papers)}: {paper['title'][:60]}...")
         prompt = _build_scoring_prompt(paper, config)
 
@@ -1168,20 +1177,31 @@ def _analyse_with_vertex_gemini(papers: list[dict[str, Any]], config: dict[str, 
                 text = re.sub(r"^```[a-z]*\n?", "", text)
                 text = re.sub(r"\n?```$", "", text)
             analysis = json.loads(text)
-            paper.update(analysis)
-            analysed.append(paper)
-            consecutive_failures = 0
-            print(f"    → score: {analysis.get('relevance_score', '?')}")
+            return (True, analysis, None)
         except Exception as e:
-            error_str = str(e)
-            print(f"    Error: {error_str}")
-            consecutive_failures += 1
-            paper.update(_default_analysis(paper))
-            analysed.append(paper)
+            return (False, None, str(e))
 
-            if consecutive_failures >= 3:
-                print("  ⚠️  3 consecutive Vertex AI Gemini failures — switching to fallback...")
-                return None, "gemini_errors"
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_paper = {executor.submit(process_paper, i, paper): paper for i, paper in enumerate(papers)}
+        for future in concurrent.futures.as_completed(future_to_paper):
+            paper = future_to_paper[future]
+            success, analysis, error_str = future.result()
+            if success:
+                paper.update(analysis)
+                analysed.append(paper)
+                consecutive_failures = 0
+                print(f"    → score: {analysis.get('relevance_score', '?')}")
+            else:
+                print(f"    Error: {error_str}")
+                consecutive_failures += 1
+                paper.update(_default_analysis(paper))
+                analysed.append(paper)
+
+                if consecutive_failures >= 3:
+                    print("  ⚠️  3 consecutive Vertex AI Gemini failures — switching to fallback...")
+                    for f in future_to_paper:
+                        f.cancel()
+                    return None, "gemini_errors"
 
     return _filter_and_sort(analysed, config), None
 
@@ -1193,7 +1213,7 @@ def _analyse_with_gemini_api(papers: list[dict[str, Any]], config: dict[str, Any
     analysed = []
     consecutive_failures = 0
 
-    for i, paper in enumerate(papers):
+    def process_paper(i, paper):
         print(f"  Analysing {i+1}/{len(papers)}: {paper['title'][:60]}...")
         prompt = _build_scoring_prompt(paper, config)
 
@@ -1207,19 +1227,31 @@ def _analyse_with_gemini_api(papers: list[dict[str, Any]], config: dict[str, Any
                 text = re.sub(r"^```[a-z]*\n?", "", text)
                 text = re.sub(r"\n?```$", "", text)
             analysis = json.loads(text)
-            paper.update(analysis)
-            analysed.append(paper)
-            consecutive_failures = 0
-            print(f"    → score: {analysis.get('relevance_score', '?')}")
+            return (True, analysis, None)
         except Exception as e:
-            print(f"    Error: {e}")
-            consecutive_failures += 1
-            paper.update(_default_analysis(paper))
-            analysed.append(paper)
+            return (False, None, str(e))
 
-            if consecutive_failures >= 3:
-                print("  ⚠️  3 consecutive Gemini API failures — switching to fallback...")
-                return None, "gemini_api_errors"
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_paper = {executor.submit(process_paper, i, paper): paper for i, paper in enumerate(papers)}
+        for future in concurrent.futures.as_completed(future_to_paper):
+            paper = future_to_paper[future]
+            success, analysis, error_str = future.result()
+            if success:
+                paper.update(analysis)
+                analysed.append(paper)
+                consecutive_failures = 0
+                print(f"    → score: {analysis.get('relevance_score', '?')}")
+            else:
+                print(f"    Error: {error_str}")
+                consecutive_failures += 1
+                paper.update(_default_analysis(paper))
+                analysed.append(paper)
+
+                if consecutive_failures >= 3:
+                    print("  ⚠️  3 consecutive Gemini API failures — switching to fallback...")
+                    for f in future_to_paper:
+                        f.cancel()
+                    return None, "gemini_api_errors"
 
     return _filter_and_sort(analysed, config), None
 
