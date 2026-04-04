@@ -60,6 +60,13 @@ except Exception:
 
 app = Flask(__name__, static_folder=None)
 
+# Path to the subscribers store — one directory up from setup/ (project root).
+# Override via SUBSCRIBERS_PATH env var for custom deployments.
+_SUBSCRIBERS_PATH = Path(
+    os.environ.get("SUBSCRIBERS_PATH", "")
+    or Path(__file__).resolve().parent.parent / "subscribers.json"
+)
+
 # ─────────────────────────────────────────────────────────────
 #  Branded error page template (inline, no external deps)
 # ─────────────────────────────────────────────────────────────
@@ -789,6 +796,100 @@ def students_register():
         return jsonify({"ok": False, "error": f"Could not reach relay: {exc.reason}"}), 502
     except Exception as exc:
         return jsonify({"ok": False, "error": f"Registration failed: {exc}"}), 500
+
+
+# ─────────────────────────────────────────────────────────────
+#  Subscriber management helpers
+# ─────────────────────────────────────────────────────────────
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$")
+
+
+def _load_subscribers() -> list[dict]:
+    """Return the subscribers list from disk, or an empty list."""
+    if _SUBSCRIBERS_PATH.exists():
+        try:
+            data = json.loads(_SUBSCRIBERS_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
+def _save_subscribers(subscribers: list[dict]) -> None:
+    """Persist the subscribers list to disk."""
+    _SUBSCRIBERS_PATH.write_text(
+        json.dumps(subscribers, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+#  Routes — Subscriber management
+# ─────────────────────────────────────────────────────────────
+
+
+@app.route("/api/subscribers", methods=["GET"])
+def subscribers_list():
+    """Return all subscribers."""
+    subs = _load_subscribers()
+    return jsonify({"subscribers": subs, "count": len(subs)})
+
+
+@app.route("/api/subscribers", methods=["POST"])
+def subscribers_add():
+    """Add a subscriber (email + keywords).
+
+    Body: {"email": "...", "keywords": ["kw1", "kw2", ...]}
+    Returns 201 on success, 400 on validation error, 409 if already subscribed.
+    """
+    data = request.get_json(force=True) or {}
+
+    email = str(data.get("email", "")).strip().lower()
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+    if not _EMAIL_RE.match(email):
+        return jsonify({"error": "Invalid email address"}), 400
+
+    raw_keywords = data.get("keywords")
+    if not isinstance(raw_keywords, list) or not raw_keywords:
+        return jsonify({"error": "keywords must be a non-empty list"}), 400
+    keywords = [str(k).strip() for k in raw_keywords if str(k).strip()]
+    if not keywords:
+        return jsonify({"error": "keywords must contain at least one non-empty string"}), 400
+
+    subs = _load_subscribers()
+    if any(s.get("email") == email for s in subs):
+        return jsonify({"error": "Email already subscribed"}), 409
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    record = {
+        "email": email,
+        "keywords": keywords,
+        "active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    subs.append(record)
+    _save_subscribers(subs)
+    return jsonify({"ok": True, "subscriber": record}), 201
+
+
+@app.route("/api/subscribers/<path:email>", methods=["DELETE"])
+def subscribers_delete(email: str):
+    """Remove a subscriber by email address.
+
+    Returns 200 on success, 404 if not found.
+    """
+    email = email.strip().lower()
+    subs = _load_subscribers()
+    new_subs = [s for s in subs if s.get("email") != email]
+    if len(new_subs) == len(subs):
+        return jsonify({"error": "Subscriber not found"}), 404
+    _save_subscribers(new_subs)
+    return jsonify({"ok": True, "email": email})
 
 
 # ─────────────────────────────────────────────────────────────

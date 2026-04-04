@@ -84,7 +84,7 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          GCP_PROJECT: silke-hub
+          GCP_PROJECT: ${{ vars.GCP_PROJECT || 'silke-hub' }}
         run: python digest.py
 
       - name: Commit keyword stats
