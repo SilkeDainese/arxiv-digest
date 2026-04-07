@@ -62,8 +62,8 @@ jobs:
           WORKFLOW_DISPATCH_LIMIT: ${{ inputs.limit }}
         run: |
           if [ -z "$STUDENT_ADMIN_TOKEN" ]; then
-            echo "No STUDENT_ADMIN_TOKEN configured; skipping AU student digests."
-            exit 0
+            echo "::error::STUDENT_ADMIN_TOKEN is not configured — cannot send student digests."
+            exit 1
           fi
           cmd=(python student_digest.py)
           if [ "$WORKFLOW_DISPATCH_PREVIEW" = "true" ]; then

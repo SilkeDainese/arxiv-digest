@@ -1,4 +1,5 @@
 digest_output.html
+subscribers.json
 **/__pycache__/
 *.pyc
 .env
