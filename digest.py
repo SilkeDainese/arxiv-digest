@@ -1508,6 +1508,56 @@ def _build_feedback_links(p: dict[str, Any], github_repo: str) -> str:
     )
 
 
+def _render_author_line(p: dict[str, Any], limit: int = 4, extra_class: str = "") -> str:
+    """Render authors with AU-affiliated names softly highlighted."""
+    authors = p.get("authors", []) or []
+    highlighted = set(p.get("au_researcher_authors", []) or [])
+    shown = authors[:limit]
+    parts: list[str] = []
+    for author in shown:
+        author_html = _esc(author)
+        if author in highlighted:
+            author_html = (
+                f'<span style="background:#E6F4EA;color:#275D38;'
+                f'border-radius:4px;padding:1px 5px;display:inline-block">{author_html}</span>'
+            )
+        parts.append(author_html)
+
+    suffix = ""
+    if len(authors) > limit:
+        suffix = f" +{len(authors) - limit}"
+
+    cls = extra_class or f"font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY}"
+    return f'<div style="{cls}">{", ".join(parts)}{_esc(suffix)}</div>'
+
+
+def _render_author_inline(p: dict[str, Any], limit: int = 4) -> str:
+    """Render the author list as inline HTML for metadata rows."""
+    return _render_author_line(
+        p,
+        limit=limit,
+        extra_class="display:inline;font-family:inherit;font-size:inherit;color:inherit",
+    ).removeprefix('<div style="display:inline;font-family:inherit;font-size:inherit;color:inherit">').removesuffix("</div>")
+
+
+def _render_au_scientist_note(p: dict[str, Any]) -> str:
+    """Return a subtle AU scientist note when the paper has AU-affiliated authors."""
+    au_authors = p.get("au_researcher_authors", []) or []
+    if not au_authors:
+        return ""
+    label = "AU scientist" if len(au_authors) == 1 else "AU scientists"
+    names = ", ".join(au_authors[:2])
+    if len(au_authors) > 2:
+        names += f" +{len(au_authors) - 2}"
+    return (
+        f'<div style="font-family:\'DM Mono\',monospace;font-size:9px;letter-spacing:0.08em;'
+        f'color:#3C7A4E;margin-bottom:8px">'
+        f'<span style="background:#E6F4EA;border-radius:999px;padding:3px 8px;display:inline-block">'
+        f'{label}: {_esc(names)}'
+        f"</span></div>"
+    )
+
+
 def _render_own_paper_section(own_papers: list[dict[str, Any]], researcher_name: str) -> str:
     """Return the 'your paper!' celebration section HTML (or empty string)."""
     if not own_papers:
@@ -1522,9 +1572,6 @@ def _render_own_paper_section(own_papers: list[dict[str, Any]], researcher_name:
 
     own_cards = ""
     for p in unique_own:
-        authors_short = ", ".join(p["authors"][:4])
-        if len(p["authors"]) > 4:
-            authors_short += f" +{len(p['authors'])-4}"
         own_cards += f"""
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px">
           <tr><td style="background:linear-gradient(135deg, {PINE_WASH}, {GOLD_WASH});border:2px solid {GOLD};border-radius:8px;padding:20px 22px">
@@ -1532,7 +1579,7 @@ def _render_own_paper_section(own_papers: list[dict[str, Any]], researcher_name:
             <div style="font-family:'DM Serif Display',Georgia,serif;font-size:18px;color:{ASH_BLACK};line-height:1.4;margin-bottom:6px">
               <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(p['title'])}</a>
             </div>
-            <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:10px">{_esc(authors_short)}</div>
+            {_render_author_line(p, limit=4, extra_class=f"font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:10px")}
             <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{UMBER};font-style:italic">Your paper appeared on arXiv! &#x1F31F;</div>
           </td></tr>
         </table>"""
@@ -1574,9 +1621,6 @@ def _render_colleague_section(colleague_papers: list[dict[str, Any]]) -> str:
                 f'<div style="font-family:\'IBM Plex Sans\',sans-serif;font-size:11px;color:{UMBER};line-height:1.45;margin-top:4px">{note}</div>'
                 for note in notes[:2]
             )
-        authors_short = ", ".join(p["authors"][:3])
-        if len(p["authors"]) > 3:
-            authors_short += f" +{len(p['authors'])-3}"
         postits += f"""
         <table width="48%" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;vertical-align:top;margin:6px 1%">
           <tr><td style="background:{GOLD_WASH};border:1px solid {GOLD_LIGHT};border-radius:6px;padding:14px 16px">
@@ -1584,7 +1628,7 @@ def _render_colleague_section(colleague_papers: list[dict[str, Any]]) -> str:
             <div style="font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:{ASH_BLACK};line-height:1.4;margin-bottom:4px">
               <a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(p['title'][:80])}{'...' if len(p['title']) > 80 else ''}</a>
             </div>
-            <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY}">{_esc(authors_short)}</div>
+            {_render_author_line(p, limit=3)}
             {notes_html}
           </td></tr>
         </table>"""
@@ -1673,10 +1717,6 @@ def detect_delights(papers: list[dict[str, Any]], max_per_email: int = 2) -> Non
 def _render_student_paper_card(p: dict[str, Any]) -> str:
     """Return a student-mode paper entry: 4-line format separated by bottom border."""
     category = p.get("category", "")
-    authors_display = ", ".join(p.get("authors", [])[:4])
-    if len(p.get("authors", [])) > 4:
-        authors_display += f" +{len(p['authors']) - 4}"
-
     # Line 1: Category label + arXiv code (text only, no pills)
     pkg_ids = p.get("student_package_ids", [])
     pkg_label = AU_STUDENT_TRACK_LABELS.get(pkg_ids[0], "") if pkg_ids else ""
@@ -1704,7 +1744,7 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
 
     # Line 4: Bottom meta (authors, date, status, arXiv link)
     pub_date = p.get("published", "")
-    meta_parts = [_esc(authors_display)]
+    meta_parts = [_render_author_inline(p, limit=4)]
     if pub_date:
         meta_parts.append(_esc(pub_date))
     status = p.get("status", "")
@@ -1729,6 +1769,7 @@ def _render_student_paper_card(p: dict[str, Any]) -> str:
     <div style="padding:14px 0;border-bottom:1px solid #E0DDD6">
         {category_line}
         {title_html}
+        {_render_au_scientist_note(p)}
         {summary_html}
         {meta_line}
         {delight_html}
@@ -1756,9 +1797,6 @@ def _render_paper_card(p: dict[str, Any], is_top_pick: bool, total_papers: int, 
         """Return a compact deep-read HTML card for a single paper."""
         score = p.get("relevance_score", 5)
         ac = _accent_color(score)
-        authors_display = ", ".join(p["authors"][:4])
-        if len(p["authors"]) > 4:
-                authors_display += f" +{len(p['authors'])-4}"
 
         top_label = ""
         if is_top_pick and total_papers > 1:
@@ -1788,7 +1826,8 @@ def _render_paper_card(p: dict[str, Any], is_top_pick: bool, total_papers: int, 
                     </tr>
                 </table>
                 <div style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;color:{ASH_BLACK};line-height:1.35;margin-bottom:4px"><a href="{p['url']}" style="color:{ASH_BLACK};text-decoration:none">{_esc(_short_title(p['title']))}</a></div>
-                <div style="font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:8px">{_esc(authors_display)}</div>
+                {_render_author_line(p, limit=4, extra_class=f"font-family:'DM Mono',monospace;font-size:10px;color:{WARM_GREY};margin-bottom:8px")}
+                {_render_au_scientist_note(p)}
                 <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:{ASH_BLACK};line-height:1.55;margin:0 0 10px"><strong>What changed:</strong> {what_changed}</div>
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px">
                     <tr><td style="background:{GOLD_WASH};border:1px solid {GOLD_LIGHT};border-radius:5px;padding:10px 12px">
