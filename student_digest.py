@@ -31,6 +31,7 @@ from digest import (
     send_failure_report,
 )
 from setup.data import ASTRO_MINI_TRACKS, AU_STUDENT_TELESCOPE_KEYWORDS
+from setup.data import AU_ASTRONOMY_PEOPLE
 from setup.student_presets import build_au_student_config
 from student_registry import (
     AVAILABLE_STUDENT_PACKAGES,
@@ -424,8 +425,10 @@ def annotate_student_packages(papers: list[dict[str, Any]]) -> None:
 _MAX_METHODS_ML_PAPERS = 2  # Hard cap: never more than 2 methods/ML papers per digest
 _CORE_ASTRO_TRACKS = {"stars", "exoplanets", "galaxies", "cosmology", "high_energy", "solar_helio", "instrumentation"}
 _FORCE_INCLUDE_AUTHOR_MATCHES = {
-    "grundahl, f",
-    "frank grundahl",
+    alias.strip().lower()
+    for person in AU_ASTRONOMY_PEOPLE
+    for alias in person.get("match", [])
+    if alias and alias.strip()
 }
 
 
@@ -440,8 +443,8 @@ def _is_ml_only_paper(paper: dict[str, Any]) -> bool:
 def _is_force_include_paper(paper: dict[str, Any]) -> bool:
     """True when a paper must appear in every student digest.
 
-    Tomorrow's digest needs Frank Grundahl's paper to land in every email
-    regardless of topic overlap or local ranking competition.
+    AU astronomy papers should land in every student digest regardless of
+    topic overlap or local ranking competition.
     """
     authors = [str(author).strip().lower() for author in paper.get("authors", [])]
     au_authors = [str(author).strip().lower() for author in paper.get("au_researcher_authors", [])]

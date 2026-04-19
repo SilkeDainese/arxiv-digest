@@ -97,10 +97,10 @@ def test_annotate_student_packages_and_rank_au_first():
     assert selected[1]["id"] == "plain-high"
 
 
-def test_select_student_papers_force_includes_frank_paper_for_all_students():
-    frank_paper = make_paper(
-        id="frank-001",
-        authors=["Grundahl, F", "Coauthor, A"],
+def test_select_student_papers_force_includes_au_astronomy_papers_for_all_students():
+    au_paper = make_paper(
+        id="au-astronomy-001",
+        authors=["Lund, M", "Marcussen, M"],
         category="astro-ph.SR",
         student_package_ids=["stars"],
         matched_keywords=[],
@@ -117,9 +117,9 @@ def test_select_student_papers_force_includes_frank_paper_for_all_students():
         for idx in range(3)
     ]
 
-    selected = select_student_papers([*higher_ranked, frank_paper], ["exoplanets"], 2)
+    selected = select_student_papers([*higher_ranked, au_paper], ["exoplanets"], 2)
 
-    assert selected[0]["id"] == "frank-001"
+    assert selected[0]["id"] == "au-astronomy-001"
 
 
 def test_make_student_digest_config_adds_manage_links():
