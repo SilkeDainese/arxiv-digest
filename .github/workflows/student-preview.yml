@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 19 * * 0'  # Sunday 19:00 UTC (21:00 Danish time)
   workflow_dispatch:
+    inputs:
+      recipient:
+        description: Optional preview recipient email override
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -29,7 +34,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DIGEST_RELAY_TOKEN: ${{ secrets.DIGEST_RELAY_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          RECIPIENT_EMAIL: ${{ inputs.recipient || secrets.RECIPIENT_EMAIL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           STUDENT_ADMIN_TOKEN: ${{ secrets.STUDENT_ADMIN_TOKEN }}

@@ -156,6 +156,30 @@ class TestSendPreviewFlag:
         with pytest.raises(SystemExit):
             sd.build_parser().parse_args(["--preview", "--send-preview"])
 
+    def test_send_preview_works_without_active_subscriptions(self):
+        """--send-preview should still send to RECIPIENT_EMAIL when no students are active."""
+        env = {"RECIPIENT_EMAIL": "silke@example.com", "STUDENT_ADMIN_TOKEN": "tok"}
+        with (
+            patch.dict("os.environ", env, clear=False),
+            patch.object(sd, "fetch_student_subscriptions", return_value=[]),
+            patch.object(sd, "fetch_arxiv_papers", return_value=[self._FAKE_PAPER]),
+            patch.object(sd, "ingest_feedback_from_github", return_value={}),
+            patch.object(sd, "pre_filter", return_value=[self._FAKE_PAPER]),
+            patch.object(sd, "fetch_aggregate_feedback", return_value={}),
+            patch.object(sd, "analyse_papers", return_value=([self._FAKE_PAPER], "claude")),
+            patch.object(sd, "annotate_student_packages"),
+            patch.object(sd, "detect_au_researchers"),
+            patch.object(sd, "detect_delights"),
+            patch.object(sd, "detect_prestige"),
+            patch.object(sd, "render_html", return_value="<html>preview</html>"),
+            patch.object(sd, "send_email", return_value=True) as mock_send,
+        ):
+            result = sd.main(["--send-preview"])
+        assert result == 0
+        mock_send.assert_called_once()
+        config_arg = mock_send.call_args[0][3]
+        assert config_arg["recipient_email"] == "silke@example.com"
+
 
 # ─────────────────────────────────────────────────────────────
 #  Welcome header — first digest only

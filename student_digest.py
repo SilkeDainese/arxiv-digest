@@ -599,14 +599,14 @@ def main(argv: list[str] | None = None) -> int:
         active_subscriptions = [
             item for item in active_subscriptions if normalise_email(item.get("email", "")) == target
         ]
-        if not active_subscriptions:
+        if not active_subscriptions and not args.send_preview:
             print(f"\nNo active student subscription found for {target}.\n")
             return 1
     if args.limit > 0:
         active_subscriptions = active_subscriptions[: args.limit]
 
     print(f"\n📬 Loaded {len(active_subscriptions)} active student subscription(s)")
-    if not active_subscriptions:
+    if not active_subscriptions and not args.send_preview:
         print("\nNo active student subscriptions. Exiting.\n")
         return 0
 
