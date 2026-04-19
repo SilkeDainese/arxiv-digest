@@ -153,7 +153,7 @@ def _call_ai(
         try:
             client = _genai_lib.Client(api_key=gemini_key)
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
             )
             return response.text.strip()
@@ -182,7 +182,7 @@ def _test_ai_key(gemini_key: str, anthropic_key: str) -> tuple[bool, str, str]:
         try:
             client = _genai_lib.Client(api_key=gemini_key)
             client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents="Hi",
                 config=_genai_types.GenerateContentConfig(max_output_tokens=1),
             )

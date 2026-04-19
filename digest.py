@@ -57,6 +57,8 @@ CONFIG_PATH = Path(__file__).parent / "config.yaml"
 CONFIG_EXAMPLE_PATH = Path(__file__).parent / "config.example.yaml"
 STATS_PATH = Path(__file__).parent / "keyword_stats.json"
 FEEDBACK_STATS_PATH = Path(__file__).parent / "feedback_stats.json"
+VERTEX_GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_API_MODEL = "gemini-2.5-flash"
 
 
 def _read_yaml() -> dict[str, Any]:
@@ -1205,7 +1207,7 @@ def _analyse_with_vertex_gemini(papers: list[dict[str, Any]], config: dict[str, 
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=VERTEX_GEMINI_MODEL,
                 contents=prompt,
             )
             text = response.text.strip()
@@ -1254,7 +1256,7 @@ def _analyse_with_gemini_api(papers: list[dict[str, Any]], config: dict[str, Any
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=GEMINI_API_MODEL,
                 contents=prompt,
             )
             text = response.text.strip()

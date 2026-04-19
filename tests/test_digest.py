@@ -1287,6 +1287,11 @@ class TestAnalysePapersCascade:
                         result, method = d.analyse_papers([p], config)
         assert method == "gemini_api"
 
+    def test_gemini_helpers_use_current_model_ids(self):
+        """Regression guard for retired/blocked Gemini model aliases."""
+        assert d.VERTEX_GEMINI_MODEL == "gemini-2.5-flash"
+        assert d.GEMINI_API_MODEL == "gemini-2.5-flash"
+
     def test_all_ai_fails_falls_back_to_keywords(self):
         """When all AI tiers fail, should cascade to keyword fallback."""
         config = make_config(min_score=1, max_papers=10)
