@@ -1261,7 +1261,28 @@ class TestAnalysePapersCascade:
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True):
             with patch.object(d, "HAS_VERTEX_GEMINI", True):
-                with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
+                with patch.object(d, "HAS_GOOGLE_GENAI", True):
+                    with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
+                        with patch.object(d, "_analyse_with_gemini_api", fake_gemini_api):
+                            result, method = d.analyse_papers([p], config)
+        assert method == "gemini_api"
+
+    def test_gemini_api_used_even_when_vertex_disabled(self):
+        """Google AI API fallback must not depend on Vertex availability."""
+        config = make_config(min_score=1, max_papers=10)
+        p = make_paper(keyword_hits=50.0)
+
+        def fake_gemini_api(papers, cfg, key):
+            for paper in papers:
+                paper.update({"relevance_score": 7, "plain_summary": "test",
+                              "why_interesting": "test", "emoji": "🔭",
+                              "highlight_phrase": "test", "kw_tags": [], "method_tags": [],
+                              "is_new_catalog": False, "cite_worthy": False, "new_result": None})
+            return papers, None
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True):
+            with patch.object(d, "HAS_VERTEX_GEMINI", False):
+                with patch.object(d, "HAS_GOOGLE_GENAI", True):
                     with patch.object(d, "_analyse_with_gemini_api", fake_gemini_api):
                         result, method = d.analyse_papers([p], config)
         assert method == "gemini_api"
@@ -1279,9 +1300,10 @@ class TestAnalysePapersCascade:
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True):
             with patch.object(d, "HAS_VERTEX_GEMINI", True):
-                with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
-                    with patch.object(d, "_analyse_with_gemini_api", fake_gemini_api):
-                        result, method = d.analyse_papers([p], config)
+                with patch.object(d, "HAS_GOOGLE_GENAI", True):
+                    with patch.object(d, "_analyse_with_vertex_gemini", fake_vertex):
+                        with patch.object(d, "_analyse_with_gemini_api", fake_gemini_api):
+                            result, method = d.analyse_papers([p], config)
         assert method == "keywords_fallback"
 
     def test_claude_mid_batch_failure_does_not_pollute_papers_for_next_tier(self):

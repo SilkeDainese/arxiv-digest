@@ -97,6 +97,31 @@ def test_annotate_student_packages_and_rank_au_first():
     assert selected[1]["id"] == "plain-high"
 
 
+def test_select_student_papers_force_includes_frank_paper_for_all_students():
+    frank_paper = make_paper(
+        id="frank-001",
+        authors=["Grundahl, F", "Coauthor, A"],
+        category="astro-ph.SR",
+        student_package_ids=["stars"],
+        matched_keywords=[],
+        relevance_score=1,
+    )
+    higher_ranked = [
+        make_paper(
+            id=f"ranked-{idx}",
+            category="astro-ph.EP",
+            student_package_ids=["exoplanets"],
+            matched_keywords=["exoplanet"],
+            relevance_score=10 - idx,
+        )
+        for idx in range(3)
+    ]
+
+    selected = select_student_papers([*higher_ranked, frank_paper], ["exoplanets"], 2)
+
+    assert selected[0]["id"] == "frank-001"
+
+
 def test_make_student_digest_config_adds_manage_links():
     config = make_student_digest_config(
         {"digest_name": "AU Astronomy Student Weekly", "tagline": "", "max_papers": 20},

@@ -416,12 +416,17 @@ def annotate_student_packages(papers: list[dict[str, Any]]) -> None:
         paper["student_package_ids"] = matched_packages
         paper["student_au_priority"] = int(
             bool(paper.get("colleague_matches"))
+            or bool(paper.get("is_au_researcher"))
             or bool(matched_keywords.intersection(au_keyword_set))
         )
 
 
 _MAX_METHODS_ML_PAPERS = 2  # Hard cap: never more than 2 methods/ML papers per digest
 _CORE_ASTRO_TRACKS = {"stars", "exoplanets", "galaxies", "cosmology", "high_energy", "solar_helio", "instrumentation"}
+_FORCE_INCLUDE_AUTHOR_MATCHES = {
+    "grundahl, f",
+    "frank grundahl",
+}
 
 
 def _is_ml_only_paper(paper: dict[str, Any]) -> bool:
@@ -430,6 +435,17 @@ def _is_ml_only_paper(paper: dict[str, Any]) -> bool:
     if not packages or packages == {"methods_ml"}:
         return not paper.get("category", "").startswith("astro-ph.")
     return False
+
+
+def _is_force_include_paper(paper: dict[str, Any]) -> bool:
+    """True when a paper must appear in every student digest.
+
+    Tomorrow's digest needs Frank Grundahl's paper to land in every email
+    regardless of topic overlap or local ranking competition.
+    """
+    authors = [str(author).strip().lower() for author in paper.get("authors", [])]
+    au_authors = [str(author).strip().lower() for author in paper.get("au_researcher_authors", [])]
+    return any(author in _FORCE_INCLUDE_AUTHOR_MATCHES for author in authors + au_authors)
 
 
 def select_student_papers(
@@ -485,14 +501,23 @@ def select_student_papers(
     selected.sort(key=_sort_key, reverse=True)
 
     # Apply hard cap on methods/ML papers
+    forced = [paper for paper in selected if _is_force_include_paper(paper)]
+    regular = [paper for paper in selected if not _is_force_include_paper(paper)]
+
     capped: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
     ml_count = 0
-    for paper in selected:
+    for paper in forced + regular:
+        paper_id = str(paper.get("id", ""))
+        if paper_id and paper_id in seen_ids:
+            continue
         if _is_ml_only_paper(paper):
             if ml_count >= _MAX_METHODS_ML_PAPERS:
                 continue
             ml_count += 1
         capped.append(paper)
+        if paper_id:
+            seen_ids.add(paper_id)
         if len(capped) >= max_papers_per_week:
             break
     return capped
@@ -635,8 +660,8 @@ def main(argv: list[str] | None = None) -> int:
         _send_admin_alert("AI scoring failed — digest not sent", msg)
         return 1
 
-    annotate_student_packages(ranked_papers)
     detect_au_researchers(ranked_papers)
+    annotate_student_packages(ranked_papers)
     detect_delights(ranked_papers)
     detect_prestige(ranked_papers)
     prestige_count = sum(1 for p in ranked_papers if p.get("prestige_journal"))

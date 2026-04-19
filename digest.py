@@ -43,8 +43,10 @@ except ImportError:
 
 try:
     from google import genai as google_genai
+    HAS_GOOGLE_GENAI = True
     HAS_VERTEX_GEMINI = True
 except ImportError:
+    HAS_GOOGLE_GENAI = False
     HAS_VERTEX_GEMINI = False
 
 # ─────────────────────────────────────────────────────────────
@@ -1353,7 +1355,7 @@ def analyse_papers(papers: list[dict[str, Any]], config: dict[str, Any]) -> tupl
             return result, "vertex_gemini"
         print("  Vertex AI Gemini unavailable — trying Gemini API key...")
 
-    if api_key_gemini and HAS_VERTEX_GEMINI:
+    if api_key_gemini and HAS_GOOGLE_GENAI:
         print("  Using Gemini via API key...")
         result, error = _analyse_with_gemini_api(copy.deepcopy(papers), config, api_key_gemini)
         if error is None:
@@ -1374,7 +1376,7 @@ def analyse_papers(papers: list[dict[str, Any]], config: dict[str, Any]) -> tupl
 from brand import (PINE, GOLD, UMBER, ASH_WHITE, ASH_BLACK,
                    CARD_BORDER, WARM_GREY, PINE_WASH, PINE_LIGHT, GOLD_LIGHT,
                    GOLD_WASH, ALERT_RED, ALERT_RED_WASH, CATALOG_PURPLE, CATALOG_WASH,
-                   CREAM, WARM_WHITE, FOOTER_BG, SOFT_GREY, TERRACOTTA, GREEN_HAND,
+                   WARM_WHITE, FOOTER_BG, SOFT_GREY, GREEN_HAND,
                    FONT_HEADING, FONT_BODY, FONT_MONO)
 from setup.data import AU_STUDENT_TRACK_LABELS, DELIGHT_KEYWORDS
 
