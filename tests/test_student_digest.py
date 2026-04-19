@@ -382,43 +382,59 @@ class TestStudentSummaryRewrite:
             },
         ]
 
-    def test_rewrite_replaces_plain_summary(self):
-        """Successful rewrite replaces plain_summary with student-friendly version."""
-        mock_anthropic = MagicMock()
-        mock_client = MagicMock()
-        mock_anthropic.Anthropic.return_value = mock_client
-        mock_client.messages.create.return_value = MagicMock(
-            content=[MagicMock(text='[{"summary": "Spinning black holes can reveal invisible particles."}, {"summary": "Two warm planets found orbiting a Sun-like star."}]')]
+    def test_rewrite_replaces_plain_summary_via_gemini_api(self):
+        """Successful Gemini rewrite replaces plain_summary with student-friendly version."""
+        mock_response = MagicMock(
+            text='[{"summary": "Spinning black holes can reveal invisible particles."}, {"summary": "Two warm planets found orbiting a Sun-like star."}]'
         )
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
 
         papers = self._make_papers()
-        with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
-            sd.rewrite_summaries_for_students(papers, "fake-key")
+        with (
+            patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}, clear=False),
+            patch.object(sd.digest_module, "HAS_VERTEX_GEMINI", False),
+            patch.object(sd.digest_module, "HAS_GOOGLE_GENAI", True),
+            patch.object(sd.digest_module, "google_genai", mock_genai, create=True),
+        ):
+            assert sd.rewrite_summaries_for_students(papers) is True
 
         assert papers[0]["plain_summary"] == "Spinning black holes can reveal invisible particles."
         assert papers[1]["plain_summary"] == "Two warm planets found orbiting a Sun-like star."
 
     def test_rewrite_keeps_original_on_failure(self):
-        """If the API call fails, original summaries are preserved."""
-        mock_anthropic = MagicMock()
+        """If both Gemini routes fail, original summaries are preserved."""
         mock_client = MagicMock()
-        mock_anthropic.Anthropic.return_value = mock_client
-        mock_client.messages.create.side_effect = Exception("API error")
+        mock_client.models.generate_content.side_effect = Exception("API error")
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
 
         papers = self._make_papers()
         original_0 = papers[0]["plain_summary"]
         original_1 = papers[1]["plain_summary"]
-        with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
-            sd.rewrite_summaries_for_students(papers, "fake-key")
+        with (
+            patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}, clear=False),
+            patch.object(sd.digest_module, "HAS_VERTEX_GEMINI", False),
+            patch.object(sd.digest_module, "HAS_GOOGLE_GENAI", True),
+            patch.object(sd.digest_module, "google_genai", mock_genai, create=True),
+        ):
+            assert sd.rewrite_summaries_for_students(papers) is False
 
         assert papers[0]["plain_summary"] == original_0
         assert papers[1]["plain_summary"] == original_1
 
-    def test_rewrite_skipped_without_api_key(self):
-        """No API key means no rewrite — originals preserved."""
+    def test_rewrite_skipped_without_any_gemini_path(self):
+        """No Gemini path means no rewrite — originals preserved."""
         papers = self._make_papers()
         original = papers[0]["plain_summary"]
-        sd.rewrite_summaries_for_students(papers, "")
+        with (
+            patch.dict("os.environ", {}, clear=False),
+            patch.object(sd.digest_module, "HAS_VERTEX_GEMINI", False),
+            patch.object(sd.digest_module, "HAS_GOOGLE_GENAI", False),
+        ):
+            assert sd.rewrite_summaries_for_students(papers) is False
         assert papers[0]["plain_summary"] == original
 
 

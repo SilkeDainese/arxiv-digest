@@ -18,6 +18,7 @@ from typing import Any
 
 import sys
 
+import digest as digest_module
 from digest import (
     analyse_papers,
     apply_feedback_bias,
@@ -82,17 +83,38 @@ def _generate_settings_token(email: str, secret: str) -> str:
     return f"{data_b64}.{sig_b64}"
 
 
-def rewrite_summaries_for_students(
-    papers: list[dict[str, Any]],
-    api_key: str,
-) -> None:
+def _parse_rewrite_payload(text: str) -> list[dict[str, Any]]:
+    """Parse a model response containing a JSON rewrite array."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
+    return json.loads(text)
+
+
+def _apply_student_rewrites(papers: list[dict[str, Any]], rewrites: list[dict[str, Any]]) -> bool:
+    """Apply parsed rewrite payloads to paper summaries."""
+    if len(rewrites) != len(papers):
+        print(f"  ⚠️  Summary rewrite returned {len(rewrites)} items for {len(papers)} papers — skipping")
+        return False
+
+    for paper, rewrite in zip(papers, rewrites):
+        new_summary = rewrite.get("summary", "").strip()
+        if new_summary:
+            paper["plain_summary"] = new_summary
+
+    print(f"  ✅ Rewrote {len(papers)} summaries for students")
+    return True
+
+
+def rewrite_summaries_for_students(papers: list[dict[str, Any]]) -> bool:
     """Rewrite plain_summary fields to be accessible to undergrad students.
 
-    Uses a single batch API call to rewrite all summaries at once.
-    Falls back gracefully — if anything fails, original summaries stay.
+    Uses Gemini first (Vertex AI, then Gemini API key). Falls back gracefully:
+    if all AI routes fail, the original summaries stay in place.
     """
-    if not api_key or not papers:
-        return
+    if not papers:
+        return False
 
     titles_and_summaries = []
     for p in papers:
@@ -168,34 +190,34 @@ Papers:
 Respond with ONLY a JSON array of objects, one per paper, in order:
 [{{"summary": "..."}}, {{"summary": "..."}}]"""
 
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
-        # Strip markdown fences if Claude wraps with ```json ... ```
-        if text.startswith("```"):
-            text = re.sub(r"^```[a-z]*\n?", "", text)
-            text = re.sub(r"\n?```$", "", text)
-        rewrites = json.loads(text)
+    if getattr(digest_module, "HAS_VERTEX_GEMINI", False):
+        try:
+            client = digest_module.google_genai.Client(
+                vertexai=True,
+                project=os.environ.get("GCP_PROJECT", "silke-hub"),
+                location="europe-west1",
+            )
+            response = client.models.generate_content(
+                model=digest_module.VERTEX_GEMINI_MODEL,
+                contents=prompt,
+            )
+            return _apply_student_rewrites(papers, _parse_rewrite_payload(response.text))
+        except Exception as e:
+            print(f"  ⚠️  Vertex student summary rewrite failed ({e}) — trying Gemini API key")
 
-        if len(rewrites) != len(papers):
-            print(f"  ⚠️  Summary rewrite returned {len(rewrites)} items for {len(papers)} papers — skipping")
-            return
+    gemini_api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if gemini_api_key and getattr(digest_module, "HAS_GOOGLE_GENAI", False):
+        try:
+            client = digest_module.google_genai.Client(api_key=gemini_api_key)
+            response = client.models.generate_content(
+                model=digest_module.GEMINI_API_MODEL,
+                contents=prompt,
+            )
+            return _apply_student_rewrites(papers, _parse_rewrite_payload(response.text))
+        except Exception as e:
+            print(f"  ⚠️  Gemini student summary rewrite failed ({e}) — using originals")
 
-        for paper, rewrite in zip(papers, rewrites):
-            new_summary = rewrite.get("summary", "").strip()
-            if new_summary:
-                paper["plain_summary"] = new_summary
-
-        print(f"  ✅ Rewrote {len(papers)} summaries for students")
-
-    except Exception as e:
-        print(f"  ⚠️  Student summary rewrite failed ({e}) — using originals")
+    return False
 
 
 def build_student_base_config() -> dict[str, Any]:
@@ -679,11 +701,10 @@ def main(argv: list[str] | None = None) -> int:
     if removed:
         print(f"   🛡️  Removed {removed} non-astronomy paper(s) (category guard)")
 
-    # Rewrite summaries for student readability (uses Haiku — cheap + fast)
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if anthropic_key:
+    # Rewrite summaries for student readability using the same Gemini path as ranking.
+    if ranked_papers:
         print("\n📝 Rewriting summaries for students...")
-        rewrite_summaries_for_students(ranked_papers, anthropic_key)
+        rewrite_summaries_for_students(ranked_papers)
 
     # FAIL-SAFE: if >50% of summaries are still over 200 chars, the rewrite
     # likely failed and students would get raw abstract fragments. Abort.
@@ -693,7 +714,7 @@ def main(argv: list[str] | None = None) -> int:
             f"Summary rewrite failed — {len(long_summaries)}/{len(ranked_papers)} papers "
             "still have raw technical summaries (>200 chars).\n"
             "Student digest aborted to avoid sending jargon-heavy content.\n\n"
-            "Check ANTHROPIC_API_KEY and Claude API status, then re-trigger:\n"
+            "Check Vertex Gemini / GEMINI_API_KEY configuration, then re-trigger:\n"
             '  gh workflow run "AU Student Digest" --repo SilkeDainese/my-arxiv-digest'
         )
         print(f"\n❌ {msg}")
